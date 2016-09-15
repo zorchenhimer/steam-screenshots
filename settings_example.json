@@ -1,0 +1,4 @@
+{
+    "RemoteDirectory": "C:/path/to/steam/remote/folder",
+    "Address": ":8080"
+}

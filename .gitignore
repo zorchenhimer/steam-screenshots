@@ -1,0 +1,8 @@
+*.exe
+*.swp
+
+settings.json
+
+# Linux binary
+steam-screenshots
+

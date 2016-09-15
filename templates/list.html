@@ -1,0 +1,7 @@
+{{define "title"}}{{.}} - {{end}}
+
+{{define "header"}}<h1>{{.Text}} - ({{.Count}})</h1><h3><a href="/">Back</a></h3>{{end}}
+
+{{define "body"}}
+{{range .}}<div class="thumbnail"><a href="{{.ImageTarget}}"><img src="{{.ThumbnailSrc}}" /><br />{{.Text}}</a></div>{{end}}
+{{end}}

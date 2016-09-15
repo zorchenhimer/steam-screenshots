@@ -1,0 +1,7 @@
+{{define "header"}}<h1>Steam Screenshots</h1>{{end}}
+
+{{define "body"}}
+    <ul>
+    {{range .}}<li><a href="{{.Target}}">{{.Pretty}}</a> ({{.Count}})</li>
+    {{end}}</ul>
+{{end}}

@@ -1,0 +1,19 @@
+{{define "main"}}
+<html>
+    <head>
+    <title>{{ block "title" .Title}}{{end}}Steam Screenshots</title>
+    <style>
+        .thumbnail {
+            width: 200px;
+            float: left;
+            margin: 5px;
+        }
+    </style>
+    </head>
+    <body>
+        {{block "header" .Header}}{{end}}
+        <div id="container">
+        {{ block "body" .Body }}{{end}}
+        </div>
+    </body>
+</html>{{end}}
