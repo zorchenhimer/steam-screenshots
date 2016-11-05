@@ -25,6 +25,17 @@ var games GameIDs
 var s Settings
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
 
+// Structure of json from steam's servers
+type steamapps struct {
+    Applist struct {
+        Apps    []struct {
+            Appid   uint64  `json:"appid"`
+            Name    string  `json:"name"`
+        }   `json:"apps"`
+    }   `json:"applist"`
+}
+
+
 func main() {
     loadSettings()
 
@@ -140,47 +151,74 @@ func getGameName(appid string) (string, error) {
     if appid == ".stfolder" {
         return appid, nil
     }
+
+    //fmt.Printf("Getting name for appid %q\n", appid)
     if name, ok := games[appid]; ok {
         return name, nil
     }
 
-    fmt.Println("[getGameName] Unable to find name for appid: ", appid)
+    // Large appid, must be a non-steam game.  This could have some edge cases
+    // as non-steam games' appids are CRCs.
+    if len(appid) > 18 {
+        games[appid] = fmt.Sprintf("Non-Steam game (%s)", appid)
+        return games[appid], nil
+    }
+
+    // TODO: rate limiting/cache age
+    updateGamesJson(appid)
+    if name, ok := games[appid]; ok {
+        return name, nil
+    }
     return appid, nil
+}
 
-    //resp, err := http.Get("https://steamdb.info/app/" + appid)
-    //if err != nil {
-    //    return appid, fmt.Errorf("Unable to get appid from steamdb: %s", err)
-    //}
+// Update the local cache of appids from steam's servers.
+func updateGamesJson(appid string) error {
+    fmt.Printf("Updating games list; looking for %q\n", appid)
+    resp, err := http.Get("http://api.steampowered.com/ISteamApps/GetAppList/v2")
+    if err != nil {
+        return fmt.Errorf("Unable to get appid list from steam: %s", err)
+    }
+    defer resp.Body.Close()
 
-    //page, err := ioutil.ReadAll(resp.Body)
-    //if err != nil {
-    //    return appid, fmt.Errorf("Unable to read steamdb response: %s", err)
-    //}
+    js, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        return fmt.Errorf("Unable to read appid json: %s", err)
+    }
 
-    //match := re_gamename.FindSubmatch(page)
-    //if len(match) != 2 {
-    //    return appid, fmt.Errorf("Unable to find game name")
-    //}
+    alist := &steamapps{}
+    if err := json.Unmarshal(js, alist); err != nil {
+        return fmt.Errorf("Unable to unmarshal json: %s", err)
+    }
 
-    //name := html.UnescapeString(string(match[1]))
-    //unc, err := strconv.Unquote(name)
-    //if err == nil {
-    //    name = unc
-    //}
-    //games[appid] = name
-    //fmt.Printf("Loaded new appid: [%s] %q\n", appid, name)
+    for _, a := range alist.Applist.Apps {
+        id := fmt.Sprintf("%d", a.Appid)
+        if _, ok := games[id]; ok {
+            if games[id] == id {
+                games[id] = a.Name
+            }
+        } else {
+            games[id] = a.Name
+        }
 
-    //marshaled, err := json.MarshalIndent(games, "", "  ")
-    //if err != nil {
-    //    return name, fmt.Errorf("Unable to marshal game")
-    //}
+        if id == appid {
+            fmt.Printf("Found game for appid %s: %q\n", appid, a.Name)
+        }
+    }
 
-    //err = ioutil.WriteFile("games.json", marshaled, 0777)
-    //if err != nil {
-    //    return name, fmt.Errorf("Unable to save games.json: %s", err)
-    //}
+    // save games.json
+    marshaled, err := json.MarshalIndent(games, "", "  ")
+    if err != nil {
+        return fmt.Errorf("Unable to marshal game json: %s", err)
+    }
 
-    //return name, nil
+    err = ioutil.WriteFile("games.json", marshaled, 0777)
+    if err != nil {
+        return fmt.Errorf("Unable to save games.json: %s", err)
+    }
+
+    fmt.Printf("Finished updating games list.  Appids: %d\n", len(games))
+    return nil
 }
 
 // Returns a filename
