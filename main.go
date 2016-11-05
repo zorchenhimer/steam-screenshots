@@ -37,6 +37,7 @@ type steamapps struct {
 
 
 func main() {
+    games = GameIDs{}
     loadSettings()
 
     if err := init_templates(); err != nil {
