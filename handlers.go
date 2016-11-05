@@ -5,6 +5,7 @@ import (
     "net/http"
     "path/filepath"
     "sort"
+    "strconv"
     "strings"
 )
 
@@ -142,4 +143,39 @@ func handler_image(w http.ResponseWriter, r *http.Request) {
         split[2])
 
     http.ServeFile(w, r, fullPath)
+}
+
+func handler_banner(w http.ResponseWriter, r *http.Request) {
+    split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+
+    if len(split) != 2 {
+        fmt.Fprintf(w, "[split error] %s", split)
+        return
+    }
+
+    appidbase := split[1]
+    if idx := strings.LastIndex(appidbase, "."); idx > -1 {
+        appidbase = appidbase[:idx]
+    }
+
+    appid, err := strconv.ParseUint(appidbase, 10, 64)
+    if err != nil {
+        fmt.Printf("[handle_banner] Invalid appid: %s", split[1])
+        http.ServeFile(w, r, "banners/unknown.jpg")
+        return
+    }
+
+    fullPath := fmt.Sprintf("banners/%s.jpg", appid)
+    if ex, _ := exists(fullPath); ex {
+        http.ServeFile(w, r, fullPath)
+    } else {
+        bannerPath, err := getGameBanner(appid)
+        if err != nil {
+            fmt.Printf("[handle_banner] Unable to get banner: %s", err)
+            http.ServeFile(w, r, "banners/unknown.jpg")
+            return
+        }
+
+        http.ServeFile(w, r, bannerPath)
+    }
 }

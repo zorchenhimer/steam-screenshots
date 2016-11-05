@@ -37,6 +37,7 @@ func main() {
     mux.HandleFunc("/", handler_main)
     mux.HandleFunc("/thumb/", handler_thumb)
     mux.HandleFunc("/img/", handler_image)
+    mux.HandleFunc("/banner/", handler_banner)
 
     server := &http.Server{
         Addr:           s.Address,
@@ -180,35 +181,54 @@ func getGameName(appid string) (string, error) {
     //}
 
     //return name, nil
+}
+
+// Returns a filename
+func getGameBanner(appid uint64) (string, error) {
+    appstr := fmt.Sprintf("%d", appid)
+    if exist, _ := exists("banners/" + appstr + ".jpg"); exist {
+        return "banners/" + appstr + ".jpg", nil
     }
 
-    page, err := ioutil.ReadAll(resp.Body)
+    resp, err := http.Get("http://cdn.akamai.steamstatic.com/steam/apps/" + appstr + "/header.jpg")
     if err != nil {
-        return appid, fmt.Errorf("Unable to read steamdb response: %s", err)
+        return "", fmt.Errorf("Unable to DL header: %s", err)
     }
 
-    match := re_gamename.FindSubmatch(page)
-    if len(match) != 2 {
-        return appid, fmt.Errorf("Unable to find game name")
+    if resp.StatusCode >= 400 && resp.StatusCode < 500 {
+        // Game not found.  Use unknown.
+
+        raw, err := ioutil.ReadFile("banners/unknown.jpg")
+        if err != nil {
+            return "", fmt.Errorf("Unable to read unknown.jpg")
+        }
+
+        if err = ioutil.WriteFile("banners/" + appstr + ".jpg", raw, 0777); err != nil {
+            return "", fmt.Errorf("Unable to save file: %s", err)
+        }
+
+        return "banners/" + appstr + ".jpg", nil
     }
 
-    name := html.UnescapeString(string(match[1]))
-    unc, err := strconv.Unquote(name)
-    if err == nil {
-        name = unc
-    }
-    games[appid] = name
-    fmt.Printf("Loaded new appid: [%s] %q\n", appid, name)
+    defer resp.Body.Close()
 
-    marshaled, err := json.MarshalIndent(games, "", "  ")
+    file, err := ioutil.ReadAll(resp.Body)
     if err != nil {
-        return name, fmt.Errorf("Unable to marshal game")
+        return "", fmt.Errorf("Unable to read file: %s", err)
     }
 
-    err = ioutil.WriteFile("games.json", marshaled, 0777)
-    if err != nil {
-        return name, fmt.Errorf("Unable to save games.json: %s", err)
+    if err = ioutil.WriteFile("banners/" + appstr + ".jpg", file, 0777); err != nil {
+        return "", fmt.Errorf("Unable to save file: %s", err)
     }
 
-    return name, nil
+    return "banners/" + appstr + ".jpg", nil
+}
+
+// exists returns whether the given file or directory exists or not.
+// Taken from https://stackoverflow.com/a/10510783
+func exists(path string) (bool, error) {
+    _, err := os.Stat(path)
+    if err == nil { return true, nil }
+    if os.IsNotExist(err) { return false, nil }
+    return true, err
 }
