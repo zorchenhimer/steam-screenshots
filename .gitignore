@@ -2,6 +2,7 @@
 *.swp
 
 settings.json
+games.json
 
 # Linux binary
 steam-screenshots
