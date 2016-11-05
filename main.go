@@ -3,13 +3,13 @@ package main
 import (
     "encoding/json"
     "fmt"
-    "html"
+    //"html"
     "io/ioutil"
     "net/http"
     "os"
     "path/filepath"
     "regexp"
-    "strconv"
+    //"strconv"
     "strings"
     "time"
 )
@@ -143,9 +143,43 @@ func getGameName(appid string) (string, error) {
         return name, nil
     }
 
-    resp, err := http.Get("https://steamdb.info/app/" + appid)
-    if err != nil {
-        return appid, fmt.Errorf("Unable to get appid from steamdb: %s", err)
+    fmt.Println("[getGameName] Unable to find name for appid: ", appid)
+    return appid, nil
+
+    //resp, err := http.Get("https://steamdb.info/app/" + appid)
+    //if err != nil {
+    //    return appid, fmt.Errorf("Unable to get appid from steamdb: %s", err)
+    //}
+
+    //page, err := ioutil.ReadAll(resp.Body)
+    //if err != nil {
+    //    return appid, fmt.Errorf("Unable to read steamdb response: %s", err)
+    //}
+
+    //match := re_gamename.FindSubmatch(page)
+    //if len(match) != 2 {
+    //    return appid, fmt.Errorf("Unable to find game name")
+    //}
+
+    //name := html.UnescapeString(string(match[1]))
+    //unc, err := strconv.Unquote(name)
+    //if err == nil {
+    //    name = unc
+    //}
+    //games[appid] = name
+    //fmt.Printf("Loaded new appid: [%s] %q\n", appid, name)
+
+    //marshaled, err := json.MarshalIndent(games, "", "  ")
+    //if err != nil {
+    //    return name, fmt.Errorf("Unable to marshal game")
+    //}
+
+    //err = ioutil.WriteFile("games.json", marshaled, 0777)
+    //if err != nil {
+    //    return name, fmt.Errorf("Unable to save games.json: %s", err)
+    //}
+
+    //return name, nil
     }
 
     page, err := ioutil.ReadAll(resp.Body)
