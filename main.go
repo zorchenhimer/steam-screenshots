@@ -50,6 +50,7 @@ func main() {
     mux.HandleFunc("/thumb/", handler_thumb)
     mux.HandleFunc("/img/", handler_image)
     mux.HandleFunc("/banner/", handler_banner)
+    mux.HandleFunc("/static/", handler_static)
 
     server := &http.Server{
         Addr:           s.Address,
@@ -59,6 +60,7 @@ func main() {
         MaxHeaderBytes: 1 << 20,
     }
 
+    fmt.Println("Fisnished startup.")
     server.ListenAndServe()
 }
 

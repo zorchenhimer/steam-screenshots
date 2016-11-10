@@ -34,6 +34,12 @@ func SortKeysByValue(m map[string]string) []string {
 }
 
 func handler_main(w http.ResponseWriter, r *http.Request) {
+    // Uncomment this for debugging HTML stuff.
+    //if err := init_templates(); err != nil {
+    //    fmt.Fprintf(w, "Error reloading templates: %s", err)
+    //    return
+    //}
+
     root, err := discover()
     if err != nil {
         fmt.Fprintf(w, "Error discovering: %s", err)
@@ -112,6 +118,7 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+// FIXME: sanitize this shit!
 func handler_thumb(w http.ResponseWriter, r *http.Request) {
     split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
     if len(split) != 3 {
@@ -132,7 +139,7 @@ func handler_thumb(w http.ResponseWriter, r *http.Request) {
 func handler_image(w http.ResponseWriter, r *http.Request) {
     split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
     if len(split) != 3 {
-        fmt.Fprintf(w, "[split error] %s", split)
+        fmt.Fprintf(w, "[split error] %s\n", split)
         return
     }
 
@@ -149,7 +156,7 @@ func handler_banner(w http.ResponseWriter, r *http.Request) {
     split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 
     if len(split) != 2 {
-        fmt.Fprintf(w, "[split error] %s", split)
+        fmt.Fprintf(w, "[split error] %s\n", split)
         return
     }
 
@@ -160,7 +167,7 @@ func handler_banner(w http.ResponseWriter, r *http.Request) {
 
     appid, err := strconv.ParseUint(appidbase, 10, 64)
     if err != nil {
-        fmt.Printf("[handle_banner] Invalid appid: %s", split[1])
+        fmt.Printf("[handle_banner] Invalid appid: %s\n", split[1])
         http.ServeFile(w, r, "banners/unknown.jpg")
         return
     }
@@ -171,11 +178,27 @@ func handler_banner(w http.ResponseWriter, r *http.Request) {
     } else {
         bannerPath, err := getGameBanner(appid)
         if err != nil {
-            fmt.Printf("[handle_banner] Unable to get banner: %s", err)
+            fmt.Printf("[handle_banner] Unable to get banner: %s\n", err)
             http.ServeFile(w, r, "banners/unknown.jpg")
             return
         }
 
         http.ServeFile(w, r, bannerPath)
+    }
+}
+
+func handler_static(w http.ResponseWriter, r *http.Request) {
+    split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+
+    if len(split) != 2 {
+        fmt.Printf("[handler_static] split error: %s\n", split)
+        return
+    }
+
+    fullPath := fmt.Sprintf("static/%s", split[1])
+    if ex, _ := exists(fullPath); ex {
+        http.ServeFile(w, r, fullPath)
+    } else {
+        fmt.Printf("[handler_static] 404 on file %q\n", fullPath)
     }
 }

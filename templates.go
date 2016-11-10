@@ -15,7 +15,6 @@ type TemplateData struct {
 }
 
 func init_templates() error {
-    fmt.Println("Loading templates")
     template_list := []string{
         "main",
         "list",

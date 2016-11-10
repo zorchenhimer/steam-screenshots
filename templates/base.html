@@ -3,23 +3,81 @@
     <head>
     <title>{{ block "title" .Title}}{{end}}Steam Screenshots</title>
     <style>
+        .body {
+            /*background-image: url("static/bg-repeat.png");
+            background-repeat: repeat-x;*/
+        }
+        #backlink {
+            float: left;
+            clear: both;
+            color: #888;
+            font-family: sans-serif;
+        }
+        #container {
+            max-width: 1440px;
+            margin: auto;
+        }
+        #title {
+            max-width: 1440px;
+            margin: auto;
+            text-align: center;
+            font-weight: bold;
+            font-family: sans-serif;
+            color: #ddd;
+        }
+        #thumblist {
+            max-width: 1260px;
+            min-width: 840px;
+            margin: auto;
+        }
         .thumbnail {
             width: 200px;
-            float: left;
-            margin: 5px;
             height: 150px;
+            float: left;
+            padding: 5px;
+            margin: auto;
         }
         .grid {
             float: left;
-            width: 480px;
+            width: 460px;
             height: 275px;
-            padding: auto;
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+        .subtext {
+            color: #888;
+            font-family: sans-serif;
+            background-color: #05070b;
+        }
+        .subtext a, #backlink a {
+            text-decoration: none;
+            color: #fff;
+        }
+        .subtext a:hover, #backlink a:hover {
+            text-decoration: underline;
+        }
+
+        /* game page */
+        .thumblink {
             text-align: center;
+            width: 200px;
+            padding-bottom: 5px;
+            padding-top: 3px;
+        }
+
+        /* main page */
+        .txtlink {
+            text-align: center;
+            font-weight: bold;
+            width: 460px;
+            margin: auto;
+            padding-bottom: 5px;
+            padding-top: 3px;
         }
     </style>
     </head>
-    <body>
-        {{block "header" .Header}}{{end}}
+    <body style="background-image: url('/static/bg-repeat.png'); background-repeat: repeat-x; background-color: #1b2838;">
+        <div id="title">{{block "header" .Header}}{{end}}</div>
         <div id="container">
         {{ block "body" .Body }}{{end}}
         </div>

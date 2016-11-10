@@ -1,7 +1,12 @@
 {{define "title"}}{{.}} - {{end}}
 
-{{define "header"}}<h1>{{.Text}} - ({{.Count}})</h1><h3><a href="/">Back</a></h3>{{end}}
+{{define "header"}}
+<h1>{{.Text}} - ({{.Count}})</h1>
+{{end}}
 
 {{define "body"}}
-{{range .}}<div class="thumbnail"><a href="{{.ImageTarget}}"><img src="{{.ThumbnailSrc}}" /><br />{{.Text}}</a></div>{{end}}
+<div id="thumblist">
+    <div id="backlink"><a href="/">&lt;-- Back</a></div><br />
+    {{range .}}<div class="thumbnail"><a href="{{.ImageTarget}}"><img src="{{.ThumbnailSrc}}" /></a><div class="thumblink subtext"><a href="{{.ImageTarget}}">{{.Text}}</a></div></div>{{end}}
+</div>
 {{end}}
