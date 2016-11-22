@@ -11,6 +11,7 @@ import (
     "regexp"
     //"strconv"
     "strings"
+    "sync"
     "time"
 )
 
@@ -20,7 +21,8 @@ type Settings struct {
 }
 
 type GameIDs map[string]string
-var games GameIDs
+var Games *GameList
+var LastUpdate  *time.Time
 
 var s Settings
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
@@ -35,9 +37,57 @@ type steamapps struct {
     }   `json:"applist"`
 }
 
+type GameList struct {
+    games   GameIDs
+    m       sync.Mutex
+}
+
+func NewGameList() *GameList {
+    return &GameList{
+        games:  make(map[string]string),
+    }
+}
+
+func (g *GameList) Get(id string) string {
+    g.m.Lock()
+    defer g.m.Unlock()
+
+    if val, ok := g.games[id]; ok {
+        return val
+    }
+    return id
+}
+
+func (g *GameList) Set(id, val string) string {
+    g.m.Lock()
+    defer g.m.Unlock()
+
+    g.games[id] = val
+    return val
+}
+
+func (g *GameList) Update(list GameIDs) {
+    g.m.Lock()
+    defer g.m.Unlock()
+
+    for key, val := range list {
+        g.games[key] = val
+    }
+}
+
+func (g GameList) GetMap() GameIDs {
+    g.m.Lock()
+    defer g.m.Unlock()
+    
+    retList := GameIDs{}
+    for key, val := range g.games {
+        retList[key] = val
+    }
+    return retList
+}
 
 func main() {
-    games = GameIDs{}
+    Games = NewGameList()
     loadSettings()
 
     if err := init_templates(); err != nil {
@@ -142,11 +192,13 @@ func loadGames() error {
         return fmt.Errorf("Error reading games file: %s", err)
     }
 
+    var games GameIDs
     err = json.Unmarshal(gamesFile, &games)
     if err != nil {
         return fmt.Errorf("Error unmarshaling games: %s", err)
     }
 
+    Games.Update(games)
     return nil
 }
 
@@ -156,27 +208,33 @@ func getGameName(appid string) (string, error) {
     }
 
     //fmt.Printf("Getting name for appid %q\n", appid)
-    if name, ok := games[appid]; ok {
+    if name := Games.Get(appid); name != appid {
         return name, nil
     }
 
     // Large appid, must be a non-steam game.  This could have some edge cases
     // as non-steam games' appids are CRCs.
     if len(appid) > 18 {
-        games[appid] = fmt.Sprintf("Non-Steam game (%s)", appid)
-        return games[appid], nil
+        return Games.Set(appid, fmt.Sprintf("Non-Steam game (%s)", appid)), nil
     }
 
     // TODO: rate limiting/cache age
-    updateGamesJson(appid)
-    if name, ok := games[appid]; ok {
-        return name, nil
+    if err := updateGamesJson(appid); err == nil {
+        if name := Games.Get(appid); name != appid {
+            return name, nil
+        }
     }
     return appid, nil
 }
 
 // Update the local cache of appids from steam's servers.
 func updateGamesJson(appid string) error {
+    if LastUpdate != nil && time.Since(*LastUpdate).Minutes() < 30 {
+        return fmt.Errorf("Cache still good.")
+    }
+
+    *LastUpdate = time.Now()
+
     fmt.Printf("Updating games list; looking for %q\n", appid)
     resp, err := http.Get("http://api.steampowered.com/ISteamApps/GetAppList/v2")
     if err != nil {
@@ -196,13 +254,7 @@ func updateGamesJson(appid string) error {
 
     for _, a := range alist.Applist.Apps {
         id := fmt.Sprintf("%d", a.Appid)
-        if _, ok := games[id]; ok {
-            if games[id] == id {
-                games[id] = a.Name
-            }
-        } else {
-            games[id] = a.Name
-        }
+        Games.Set(id, a.Name)
 
         if id == appid {
             fmt.Printf("Found game for appid %s: %q\n", appid, a.Name)
@@ -210,6 +262,7 @@ func updateGamesJson(appid string) error {
     }
 
     // save games.json
+    games := Games.GetMap()
     marshaled, err := json.MarshalIndent(games, "", "  ")
     if err != nil {
         return fmt.Errorf("Unable to marshal game json: %s", err)
