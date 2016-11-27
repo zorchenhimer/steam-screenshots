@@ -1,6 +1,6 @@
 {{define "header"}}<h1>Steam Screenshots</h1>{{end}}
 
 {{define "body"}}
-    {{range .}}<div class="grid"><a href="{{.Target}}"><img src="/banner/{{.Target}}" /></a><div class="txtlink subtext"><a href="{{.Target}}">{{.Pretty}}</a> ({{.Count}})</div></div>
+    {{range .}}<div class="grid{{.Clear}}"><a href="{{.Target}}"><img src="/banner/{{.Target}}" /></a><div class="txtlink subtext"><a href="{{.Target}}">{{.Pretty}}</a> ({{.Count}})</div></div>
     {{end}}
 {{end}}

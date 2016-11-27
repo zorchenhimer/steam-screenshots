@@ -15,7 +15,9 @@
         }
         #container {
             max-width: 1440px;
-            margin: auto;
+            width: 100%;
+            /*margin: auto;*/
+            margin-left: 2.5%;
         }
         #title {
             max-width: 1440px;
@@ -39,10 +41,19 @@
         }
         .grid {
             float: left;
-            width: 460px;
-            height: 275px;
-            padding-left: 10px;
-            padding-right: 10px;
+            /*width: 460px;
+            height: 275px;*/
+            width: 30%;
+            /*padding-left: 10px;
+            padding-right: 10px;*/
+            padding-right: 2.5%;
+            padding-bottom: 10px;
+        }
+        .grid img {
+            width: 100%;
+        }
+        .clearme {
+            clear: both;
         }
         .subtext {
             color: #888;
@@ -69,10 +80,19 @@
         .txtlink {
             text-align: center;
             font-weight: bold;
-            width: 460px;
+            width: 100%;
+            /*width: 460px;*/
             margin: auto;
             padding-bottom: 5px;
             padding-top: 3px;
+        }
+        @media screen and (max-width: 550px) {
+            .grid {
+                clear: both;
+                width: 90%;
+                margin: auto;
+                padding-left: 2.5%;
+            }
         }
     </style>
     </head>

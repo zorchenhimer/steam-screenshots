@@ -66,13 +66,19 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
             }
             d.Body = []map[string]string{}
 
-            for _, filename := range files {
+            for idx, filename := range files {
                 base := filepath.Base(filename)
+                clearclass := ""
+                if idx % 3 == 0 {
+                    clearclass = " clearme"
+                    //fmt.Printf("Clearme on %q\n", base)
+                }
                 
                 d.Body = append(d.Body, map[string]string{
                     "ImageTarget":  "/img/" + trimmed + "/" + base,
                     "ThumbnailSrc": "/thumb/" + trimmed + "/" + base,
                     "Text":         base,
+                    "Clear":        clearclass,
                 })
             }
 
@@ -102,12 +108,18 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
 
         sort.Sort(StringSliceNoCase(gameKeys))
 
-        for _, pretty := range gameKeys {
+        for idx, pretty := range gameKeys {
+            clearclass := ""
+            if idx % 3 == 0 {
+                clearclass = " clearme"
+                //fmt.Printf("Clearme on %q\n", pretty)
+            }
             appid := gameNames[pretty]
             d.Body = append(d.Body, map[string]string{
                 "Target":   "/" + appid + "/",
                 "Pretty":   pretty,
                 "Count":    fmt.Sprintf("%d", len(root[appid])),
+                "Clear":    clearclass,
             })
         }
 
