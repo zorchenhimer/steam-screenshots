@@ -16,8 +16,11 @@
         #container {
             max-width: 1440px;
             width: 100%;
-            /*margin: auto;*/
-            margin-left: 2.5%;
+            margin: auto;
+            /*padding-left: 2.5%;*/
+        }
+        #mainlist {
+            padding-left: 2.5%;
         }
         #title {
             max-width: 1440px;
@@ -26,11 +29,6 @@
             font-weight: bold;
             font-family: sans-serif;
             color: #ddd;
-        }
-        #thumblist {
-            max-width: 1260px;
-            min-width: 840px;
-            margin: auto;
         }
         .thumbnail {
             width: 200px;
@@ -86,6 +84,7 @@
             padding-bottom: 5px;
             padding-top: 3px;
         }
+
         @media screen and (max-width: 550px) {
             .grid {
                 clear: both;
@@ -93,6 +92,24 @@
                 margin: auto;
                 padding-left: 2.5%;
             }
+        }
+
+        #thumblist {
+            max-width: 1260px;
+            /*min-width: 840px;*/
+            margin: auto;
+        }
+        @media screen and (max-width: 1300px) {
+            #thumblist { width: 1050px; }
+        }
+        @media screen and (max-width: 1080px) {
+            #thumblist { width: 840px; }
+        }
+        @media screen and (max-width: 870px) {
+            #thumblist { width: 630px; }
+        }
+        @media screen and (max-width: 660px) {
+            #thumblist { width: 420px; }
         }
     </style>
     </head>
