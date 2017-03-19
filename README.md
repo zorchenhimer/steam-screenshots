@@ -42,10 +42,14 @@ only want to allow local connections on port 8080 set this to `127.0.0.1:8080`.
  1. Set up Syncthing on both the server and your machine that's got the
  screenshots.  See [here](https://docs.syncthing.net/intro/getting-started.html)
  for a Getting Started guide.
- 2. Grab a release of steam-screenshots and put it in a folder (like `~/steam/`)
- 3. `cd` to that folder and start tmux or screen (whichever you installed).
- 4. Copy `settings_example.json` to `settings.json` and verify the settings.
- 5. Run `./steam-screenshots`
- 6. Detach the tmux or screen session (`Ctrl-b, d` for tmux, `Ctrl-a d` for
+ 2. Sync your steam folder between your local machine and your server.  Find
+ your steam screenshot folder by right clicking a game in steam that you have
+ taken screenshots for and selecting "View Screenshots".
+ 3. Grab a release of steam-screenshots and put it in a folder (like `~/steam/`)
+ 4. `cd` to that folder and start tmux or screen (whichever you installed).
+ 5. Copy `settings_example.json` to `settings.json` and verify the settings. 
+ Enter the synced "remote" folder's path into settings.json (from step 2).
+ 6. Run `./steam-screenshots`
+ 7. Detach the tmux or screen session (`Ctrl-b, d` for tmux, `Ctrl-a d` for
  screen)
 
