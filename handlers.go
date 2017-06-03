@@ -14,6 +14,8 @@ func (p StringSliceNoCase) Len() int           { return len(p) }
 func (p StringSliceNoCase) Less(i, j int) bool { return strings.ToLower(p[i]) < strings.ToLower(p[j]) }
 func (p StringSliceNoCase) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
+var dataTree map[string][]string
+
 func SortKeysByValue(m map[string]string) []string {
     vals := []string{}
     for _, v := range m {
@@ -40,18 +42,19 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
     //    return
     //}
 
-    root, err := discover()
-    if err != nil {
-        fmt.Fprintf(w, "Error discovering: %s", err)
-        return
-    }
+    //root, err := discover()
+    //if err != nil {
+    //    fmt.Fprintf(w, "Error discovering: %s", err)
+    //    return
+    //}
 
-    keys := GetKeys(root)
+    //keys := GetKeys(root)
+    keys := GetKeys(dataTree)
 
     if r.URL.Path != "/" {
         trimmed := strings.Trim(r.URL.Path, "/")
         if SliceContains(keys, trimmed) {
-            files := root[trimmed]
+            files := dataTree[trimmed]
             sort.Strings(files)
             pretty, err := getGameName(trimmed)
             if err != nil {
@@ -118,7 +121,7 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
             d.Body = append(d.Body, map[string]string{
                 "Target":   "/" + appid + "/",
                 "Pretty":   pretty,
-                "Count":    fmt.Sprintf("%d", len(root[appid])),
+                "Count":    fmt.Sprintf("%d", len(dataTree[appid])),
                 "Clear":    clearclass,
             })
         }

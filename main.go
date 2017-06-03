@@ -13,6 +13,8 @@ import (
     "strings"
     "sync"
     "time"
+
+    "github.com/fsnotify/fsnotify"
 )
 
 type Settings struct {
@@ -117,41 +119,96 @@ func main() {
         MaxHeaderBytes: 1 << 20,
     }
 
+    ready := make(chan bool)
+    go watchThings(ready)
+    if <-ready {
+        fmt.Println("Watching things OK")
+    } else {
+        fmt.Println("Watching things NOT OK")
+        return
+    }
+
+    fmt.Println("Listening on address: " + s.Address)
     fmt.Println("Fisnished startup.")
     server.ListenAndServe()
 }
 
-// Returns a list of folders that have screenshot directories
-func discover() (map[string][]string, error) {
-    loadSettings()
-
+// Keep an eye on the directory and re-discover as needed.
+func watchThings(ready chan bool) {
+    // Initial discovery
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
-        return nil, fmt.Errorf("Error Globbing: %s", err)
+        fmt.Println("Unable to glob RemoteDirectory: ", err)
+        ready <- false
+        return
     }
-
-    found := map[string][]string{}
+    dataTree = make(map[string][]string)
 
     for _, d := range dir {
         if strings.HasPrefix(filepath.Base(d), ".") {
             continue
         }
 
-        dfound := []string{}
-        jpg, err := filepath.Glob(filepath.Join(d, "screenshots", "*.jpg"))
-        if err == nil {
-            dfound = append(dfound, jpg...)
+        disc, err := discoverDir(d)
+        if err != nil {
+            fmt.Println(err)
+            continue
         }
 
-        png, err := filepath.Glob(filepath.Join(d, "screenshots", "*.png"))
-        if err == nil {
-            dfound = append(dfound, png...)
-        }
-
-        if len(dfound) > 0 {
-            found[filepath.Base(d)] = dfound
-        }
+        dataTree[filepath.Base(d)] = disc
     }
+
+    w_root, err := fsnotify.NewWatcher()
+    if err != nil {
+        fmt.Println("Falied to create root watcher: ", err);
+        return
+    }
+    defer w_root.Close()
+
+    done := make(chan bool)
+    go func() {
+        for {
+            //fmt.Print(".")
+            select {
+                case event := <-w_root.Events:
+                    if event.Op > 0 {
+                        fmt.Println("w_root event: ", event)
+                        if event.Op&fsnotify.Write == fsnotify.Write {
+                            fmt.Println("Modified file: " , event.Name)
+                        }
+                    }
+                case err := <-w_root.Errors:
+                    if err != nil {
+                        fmt.Println("w_root error: ", err)
+                    }
+            }
+        }
+    }()
+
+    if err = w_root.Add(s.RemoteDirectory); err != nil {
+        fmt.Println("Unable to add root directory to w_root: ", err)
+        return
+    }
+
+    fmt.Printf("Watching directory %q\n", s.RemoteDirectory)
+    ready <- true
+    <-done
+}
+
+// Discover things in a single directory
+func discoverDir(dir string) ([]string, error) {
+    found := []string{}
+    jpg, err := filepath.Glob(filepath.Join(dir, "screenshots", "*.jpg"))
+    if err != nil {
+        return nil, fmt.Errorf("JPG glob error in %q: %s", dir, err)
+    }
+    found = append(found, jpg...)
+
+    png, err := filepath.Glob(filepath.Join(dir, "screenshots", "*.png"))
+    if err != nil {
+        return nil, fmt.Errorf("PNG glob error in %q: %s", dir, err)
+    }
+    found = append(found, png...)
 
     return found, nil
 }
@@ -190,6 +247,9 @@ func loadSettings() error {
         return fmt.Errorf("Error unmarshaling settings: %s", err)
     }
 
+    fmt.Println("Settings loaded")
+
+    //updateGamesJson("")
     return loadGames()
 }
 
@@ -213,6 +273,7 @@ func loadGames() error {
     }
 
     Games.Update(games)
+    //fmt.Println("Number of games loaded: ", Games.Length())
     return nil
 }
 
