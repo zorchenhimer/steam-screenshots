@@ -1,7 +1,11 @@
 package main
 
 import (
+    "bytes"
+    "compress/gzip"
     "fmt"
+    "io"
+    "io/ioutil"
     "net/http"
     "path/filepath"
     "sort"
@@ -186,7 +190,9 @@ func handler_banner(w http.ResponseWriter, r *http.Request) {
 
     fullPath := fmt.Sprintf("banners/%s.jpg", appid)
     if ex := exists(fullPath); ex {
-        http.ServeFile(w, r, fullPath)
+        handler_ServeBanner(w, r, fullPath)
+        //w.Header().Add("Cache-Control", "max-age=43200, public, must-revalidate, proxy-revalidate")
+        //http.ServeFile(w, r, fullPath)
     } else {
         bannerPath, err := getGameBanner(appid)
         if err != nil {
@@ -195,7 +201,66 @@ func handler_banner(w http.ResponseWriter, r *http.Request) {
             return
         }
 
-        http.ServeFile(w, r, bannerPath)
+        handler_ServeBanner(w, r, bannerPath)
+        //w.Header().Add("Cache-Control", "max-age=43200, public, must-revalidate, proxy-revalidate")
+        //http.ServeFile(w, r, bannerPath)
+    }
+}
+
+func handler_ServeBanner(w http.ResponseWriter, r *http.Request, bannerPath string) {
+    gz := false
+    //Accept-Encoding: gzip, deflate
+    //if enc := r.Header.Get("Accept-Encoding"); strings.Contains(enc, "gzip") {
+    //    gz = true
+    //}
+
+    raw, err := ioutil.ReadFile(bannerPath)
+    if err != nil {
+        fmt.Printf("[handle_ServeBanner] Unable to read banner: %s\n", err)
+        http.ServeFile(w, r, "banners/unknown.jpg")
+        return
+    }
+
+    contentType := "application/octet-stream"
+    if strings.HasSuffix(bannerPath, ".jpg") {
+        contentType = "image/jpeg"
+    } else if strings.HasSuffix(bannerPath, ".png") {
+        contentType = "image/png"
+    }
+
+    w.Header().Add("Content-Type", contentType)
+    w.Header().Add("Cache-Control", "max-age=43200, public, must-revalidate, proxy-revalidate")
+    //w.Header().Add("Content-Length", fmt.Sprintf("%d", len(raw)))
+
+    if gz {
+        fmt.Printf("[handle_ServeBanner] gzipping response\n  raw length: %d\n", len(raw))
+        w.Header().Add("Content-Encoding", "gzip,deflate")
+
+        gzw := gzip.NewWriter(w)
+        reader := bytes.NewReader(raw)
+        if num, err := io.Copy(gzw, reader); err != nil {
+            fmt.Printf("[handle_ServeBanner %q] Error in io.Copy(): %s\n", bannerPath, err)
+            fmt.Fprint(w, raw)
+            return
+        } else {
+            fmt.Printf("[handle_ServeBanner %q] Bytes copied: %d\n", bannerPath, num)
+        }
+
+        if err := gzw.Close(); err != nil {
+            fmt.Printf("[handle_ServeBanner %q] Error in gzw.Close(): %s\n", bannerPath, err)
+            return
+        }
+
+        //fmt.Fprint(g, raw)
+        //g.Close()
+    } else {
+        reader := bytes.NewReader(raw)
+        if n, err := io.Copy(w, reader); err != nil {
+            fmt.Printf("[handle_ServeBanner %q] Error in plain io.Copy(): %s\n", bannerPath, err)
+        } else {
+            fmt.Printf("[handle_ServeBanner %q] Bytes copied: %d\n", bannerPath, n)
+        }
+        //fmt.Fprint(w, raw)
     }
 }
 
