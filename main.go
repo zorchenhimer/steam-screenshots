@@ -135,6 +135,12 @@ func main() {
 
 // Keep an eye on the directory and re-discover as needed.
 func watchThings(ready chan bool) {
+    type watcher struct {
+        base string
+        watch *fsnotify.Watcher
+    }
+    w_list := []watcher{}
+
     // Initial discovery
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
@@ -145,7 +151,8 @@ func watchThings(ready chan bool) {
     dataTree = make(map[string][]string)
 
     for _, d := range dir {
-        if strings.HasPrefix(filepath.Base(d), ".") {
+        base := filepath.Base(d)
+        if strings.HasPrefix(base, ".") {
             continue
         }
 
@@ -154,10 +161,25 @@ func watchThings(ready chan bool) {
             fmt.Println(err)
             continue
         }
+        dataTree[base] = disc
 
-        dataTree[filepath.Base(d)] = disc
+        w, err := fsnotify.NewWatcher()
+        if err != nil {
+            fmt.Println("Unable to create watch for %q: %s", base, err)
+            ready <- false
+            return
+        }
+
+        if err := w.Add(filepath.Join(d, "screenshots")); err != nil {
+            fmt.Println("Unable to add dir to watch %q: %s", base, err)
+            ready <- false
+            return
+        }
+
+        w_list = append(w_list, watcher{base: base, watch: w})
     }
 
+    // Watch things to auto-discover them
     w_root, err := fsnotify.NewWatcher()
     if err != nil {
         fmt.Println("Falied to create root watcher: ", err);
@@ -166,15 +188,33 @@ func watchThings(ready chan bool) {
     defer w_root.Close()
 
     done := make(chan bool)
+    lock := sync.Mutex{}
+
+    // Root monitor.  Creates and deletes other monitors.
     go func() {
         for {
-            //fmt.Print(".")
             select {
                 case event := <-w_root.Events:
                     if event.Op > 0 {
                         fmt.Println("w_root event: ", event)
-                        if event.Op&fsnotify.Write == fsnotify.Write {
-                            fmt.Println("Modified file: " , event.Name)
+                        if event.Op&fsnotify.Create == fsnotify.Create {
+                            fmt.Println("Create event")
+                            newdir := filepath.Base(event.Name)
+                            w, err := fsnotify.NewWatcher()
+                            if err != nil {
+                                fmt.Printf("Unable to create watcher for %q: %s\n", newdir, err)
+                                continue
+                            }
+
+                            if err := w.Add(filepath.Join(newdir, "screenshots")); err != nil {
+                                fmt.Printf("Unable to add dir to watch %q: %s\n", newdir, err)
+                                continue
+                            }
+
+                            lock.Lock()
+                            w_list = append(w_list, watcher{base: newdir, watch: w})
+                            lock.Unlock()
+                            fmt.Printf("New directory %q added to watch list\n", newdir)
                         }
                     }
                 case err := <-w_root.Errors:
@@ -182,6 +222,27 @@ func watchThings(ready chan bool) {
                         fmt.Println("w_root error: ", err)
                     }
             }
+        }
+    }()
+
+    // Directory monitor.
+    go func() {
+        for {
+            lock.Lock()
+            for _, w := range w_list {
+                select {
+                    case event := <-w.watch.Events:
+                        if event.Op > 0 {
+                            fmt.Printf("%s event: %s", w.base, event)
+                        }
+                    case err := <-w.watch.Errors:
+                        if err != nil {
+                            fmt.Println("% error: %s", w.base, err)
+                        }
+                }
+            }
+            lock.Unlock()
+            time.Sleep(100 * time.Millisecond)
         }
     }()
 
