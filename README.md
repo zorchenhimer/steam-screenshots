@@ -1,4 +1,5 @@
 # Steam Screenshot Server
+[![Build Status](https://travis-ci.org/zorchenhimer/steam-screenshots.svg?branch=master)](https://travis-ci.org/zorchenhimer/steam-screenshots)
 
 A simple little server to host screenshots taken from steam games.
 
