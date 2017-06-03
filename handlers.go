@@ -185,7 +185,7 @@ func handler_banner(w http.ResponseWriter, r *http.Request) {
     }
 
     fullPath := fmt.Sprintf("banners/%s.jpg", appid)
-    if ex, _ := exists(fullPath); ex {
+    if ex := exists(fullPath); ex {
         http.ServeFile(w, r, fullPath)
     } else {
         bannerPath, err := getGameBanner(appid)
@@ -208,7 +208,7 @@ func handler_static(w http.ResponseWriter, r *http.Request) {
     }
 
     fullPath := fmt.Sprintf("static/%s", split[1])
-    if ex, _ := exists(fullPath); ex {
+    if ex := exists(fullPath); ex {
         http.ServeFile(w, r, fullPath)
     } else {
         fmt.Printf("[handler_static] 404 on file %q\n", fullPath)

@@ -78,7 +78,7 @@ func (g *GameList) Update(list GameIDs) {
 func (g GameList) GetMap() GameIDs {
     g.m.Lock()
     defer g.m.Unlock()
-    
+
     retList := GameIDs{}
     for key, val := range g.games {
         retList[key] = val
@@ -86,9 +86,16 @@ func (g GameList) GetMap() GameIDs {
     return retList
 }
 
+func (g GameList) Length() int {
+    return len(g.games)
+}
+
 func main() {
     Games = NewGameList()
-    loadSettings()
+    if err := loadSettings(); err != nil {
+        fmt.Printf("Error loading settings: %s\n", err)
+        return
+    }
 
     if err := init_templates(); err != nil {
         fmt.Printf("Error loading templates: %s\n", err)
@@ -187,6 +194,13 @@ func loadSettings() error {
 }
 
 func loadGames() error {
+    if ex := exists("games.json"); !ex {
+        fmt.Println("games.json doesn't exist.  Getting a new one.")
+        if err := updateGamesJson(); err != nil {
+            return fmt.Errorf("Unable update game list: %", err)
+        }
+    }
+
     gamesFile, err := ioutil.ReadFile("games.json")
     if err != nil {
         return fmt.Errorf("Error reading games file: %s", err)
@@ -219,7 +233,7 @@ func getGameName(appid string) (string, error) {
     }
 
     // TODO: rate limiting/cache age
-    if err := updateGamesJson(appid); err == nil {
+    if err := updateGamesJson(); err == nil {
         if name := Games.Get(appid); name != appid {
             return name, nil
         }
@@ -228,14 +242,18 @@ func getGameName(appid string) (string, error) {
 }
 
 // Update the local cache of appids from steam's servers.
-func updateGamesJson(appid string) error {
+func updateGamesJson() error {
     if LastUpdate != nil && time.Since(*LastUpdate).Minutes() < 30 {
-        return fmt.Errorf("Cache still good.")
+        //return fmt.Errorf("Cache still good.")
+        fmt.Println("Not updating games list; cache still good.")
+        return nil
     }
 
-    *LastUpdate = time.Now()
+    now := time.Now()
+    //fmt.Printf("time.Now(): {}\n", now)
+    LastUpdate = &now
 
-    fmt.Printf("Updating games list; looking for %q\n", appid)
+    fmt.Println("Updating games list")
     resp, err := http.Get("http://api.steampowered.com/ISteamApps/GetAppList/v2")
     if err != nil {
         return fmt.Errorf("Unable to get appid list from steam: %s", err)
@@ -256,9 +274,6 @@ func updateGamesJson(appid string) error {
         id := fmt.Sprintf("%d", a.Appid)
         Games.Set(id, a.Name)
 
-        if id == appid {
-            fmt.Printf("Found game for appid %s: %q\n", appid, a.Name)
-        }
     }
 
     // save games.json
@@ -280,7 +295,7 @@ func updateGamesJson(appid string) error {
 // Returns a filename
 func getGameBanner(appid uint64) (string, error) {
     appstr := fmt.Sprintf("%d", appid)
-    if exist, _ := exists("banners/" + appstr + ".jpg"); exist {
+    if exist := exists("banners/" + appstr + ".jpg"); exist {
         return "banners/" + appstr + ".jpg", nil
     }
 
@@ -320,9 +335,9 @@ func getGameBanner(appid uint64) (string, error) {
 
 // exists returns whether the given file or directory exists or not.
 // Taken from https://stackoverflow.com/a/10510783
-func exists(path string) (bool, error) {
+func exists(path string) bool {
     _, err := os.Stat(path)
-    if err == nil { return true, nil }
-    if os.IsNotExist(err) { return false, nil }
-    return true, err
+    if err == nil { return true }
+    if os.IsNotExist(err) { return false }
+    return true
 }

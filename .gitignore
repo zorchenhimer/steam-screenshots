@@ -5,6 +5,7 @@ settings.json
 games.json
 
 builds/
+data/
 
 # Linux binary
 steam-screenshots
