@@ -75,7 +75,7 @@ func (g *GameList) Update(list GameIDs) {
     }
 }
 
-func (g GameList) GetMap() GameIDs {
+func (g *GameList) GetMap() GameIDs {
     g.m.Lock()
     defer g.m.Unlock()
 
@@ -86,7 +86,10 @@ func (g GameList) GetMap() GameIDs {
     return retList
 }
 
-func (g GameList) Length() int {
+func (g *GameList) Length() int {
+    g.m.Lock()
+    defer g.m.Unlock()
+
     return len(g.games)
 }
 
@@ -197,7 +200,7 @@ func loadGames() error {
     if ex := exists("games.json"); !ex {
         fmt.Println("games.json doesn't exist.  Getting a new one.")
         if err := updateGamesJson(); err != nil {
-            return fmt.Errorf("Unable update game list: %", err)
+            return fmt.Errorf("Unable update game list: %s", err)
         }
     }
 
