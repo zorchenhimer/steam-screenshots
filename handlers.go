@@ -187,7 +187,7 @@ func handler_banner(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    fullPath := fmt.Sprintf("banners/%s.jpg", appid)
+    fullPath := fmt.Sprintf("banners/%d.jpg", appid)
     if ex := exists(fullPath); ex {
         http.ServeFile(w, r, fullPath)
     } else {
