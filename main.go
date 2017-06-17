@@ -39,60 +39,9 @@ type steamapps struct {
     }   `json:"applist"`
 }
 
-type GameList struct {
-    games   GameIDs
-    m       sync.Mutex
-}
-
-func NewGameList() *GameList {
-    return &GameList{
-        games:  make(map[string]string),
-    }
-}
-
-func (g *GameList) Get(id string) string {
-    g.m.Lock()
-    defer g.m.Unlock()
-
-    if val, ok := g.games[id]; ok {
-        return val
-    }
-    return id
-}
-
-func (g *GameList) Set(id, val string) string {
-    g.m.Lock()
-    defer g.m.Unlock()
-
-    g.games[id] = val
-    return val
-}
-
-func (g *GameList) Update(list GameIDs) {
-    g.m.Lock()
-    defer g.m.Unlock()
-
-    for key, val := range list {
-        g.games[key] = val
-    }
-}
-
-func (g GameList) GetMap() GameIDs {
-    g.m.Lock()
-    defer g.m.Unlock()
-
-    retList := GameIDs{}
-    for key, val := range g.games {
-        retList[key] = val
-    }
-    return retList
-}
-
-func (g GameList) Length() int {
-    return len(g.games)
-}
-
 func main() {
+    ImageCache = NewImageData()
+
     Games = NewGameList()
     if err := loadSettings(); err != nil {
         fmt.Printf("Error loading settings: %s\n", err)
@@ -127,6 +76,8 @@ func main() {
         fmt.Println("Watching things NOT OK")
         return
     }
+
+    ImageCache.Dump()
 
     fmt.Println("Listening on address: " + s.Address)
     fmt.Println("Fisnished startup.")
@@ -163,15 +114,29 @@ func watchThings(ready chan bool) {
         }
         dataTree[base] = disc
 
+        for _, imagefile := range disc {
+            img, err := readImage(imagefile)
+            if err != nil {
+                fmt.Println(err)
+                continue
+            }
+
+            if err := ImageCache.Add(imagefile, img); err != nil {
+                fmt.Println(err)
+                ready <- false
+                return
+            }
+        }
+
         w, err := fsnotify.NewWatcher()
         if err != nil {
-            fmt.Println("Unable to create watch for %q: %s", base, err)
+            fmt.Printf("Unable to create watch for %q: %s\n", base, err)
             ready <- false
             return
         }
 
         if err := w.Add(filepath.Join(d, "screenshots")); err != nil {
-            fmt.Println("Unable to add dir to watch %q: %s", base, err)
+            fmt.Printf("Unable to add dir to watch %q: %s\n", base, err)
             ready <- false
             return
         }
@@ -233,11 +198,11 @@ func watchThings(ready chan bool) {
                 select {
                     case event := <-w.watch.Events:
                         if event.Op > 0 {
-                            fmt.Printf("%s event: %s", w.base, event)
+                            fmt.Printf("%s event: %s\n", w.base, event)
                         }
                     case err := <-w.watch.Errors:
                         if err != nil {
-                            fmt.Println("% error: %s", w.base, err)
+                            fmt.Printf("%s error: %s\n", w.base, err)
                         }
                 }
             }
@@ -265,11 +230,11 @@ func discoverDir(dir string) ([]string, error) {
     }
     found = append(found, jpg...)
 
-    png, err := filepath.Glob(filepath.Join(dir, "screenshots", "*.png"))
-    if err != nil {
-        return nil, fmt.Errorf("PNG glob error in %q: %s", dir, err)
-    }
-    found = append(found, png...)
+    //png, err := filepath.Glob(filepath.Join(dir, "screenshots", "*.png"))
+    //if err != nil {
+    //    return nil, fmt.Errorf("PNG glob error in %q: %s", dir, err)
+    //}
+    //found = append(found, png...)
 
     return found, nil
 }
