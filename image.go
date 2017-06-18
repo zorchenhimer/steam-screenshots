@@ -4,13 +4,12 @@ package main
 
 import (
     "bufio"
-    "path/filepath"
-    "fmt"
     "errors"
+    "fmt"
     "image/jpeg"
-    //"image/png"
     "io"
     "os"
+    "path/filepath"
     "strconv"
     "strings"
 )
@@ -27,8 +26,7 @@ func (i ImageDimensions) String() string {
 
 type ImageData struct {
     current int
-// TODO: AAAAAAAAAAAHHHHHHHHHHHHH
-    keys []string
+    keys []string       // AppId
     vals []*ImageDimensions
 }
 
@@ -189,20 +187,22 @@ func LoadCachedImageData(filename string) (*ImageData, error) {
 }
 
 func ParseImages(path string) (*ImageData, error) {
-    dir, err := filepath.Glob(filepath.Join(path, "*.jpg"))
+    appid := filepath.Base(path)
+    //panic("appid: " + appid)
+    dir, err := filepath.Glob(filepath.Join(path, "screenshots", "*.jpg"))
     if err != nil {
         return nil, err
     }
 
     data := NewImageData()
     for _, f := range dir {
-        dims, err := readImage(filepath.Join(path, f))
+        dims, err := readImage(f)
         if err != nil {
             fmt.Println(err)
             continue
         }
 
-        if err := data.Add(f, dims); err != nil {
+        if err := data.Add(filepath.Join(appid, filepath.Base(f)), dims); err != nil {
             fmt.Println(err)
         }
     }
@@ -283,4 +283,37 @@ func (i *ImageData) Dump() {
 
         fmt.Printf("%s: %s\n", keystr, valstr)
     }
+}
+
+type Metadata struct {
+    Src     string `json:"src"`
+    Width   int `json:"w"`
+    Height  int `json:"h"`
+}
+
+func (i *ImageData) GetMetadata(appid string) []Metadata {
+    images := []Metadata{}
+
+    for x := 0; x < i.Length(); x++ {
+        things := strings.Split(i.keys[x], "\\")
+        if len(things) < 1 {
+            fmt.Printf("Things borked")
+            continue
+        }
+
+        if things[0] != appid {
+            continue
+        }
+
+        img := Metadata{
+            Src: "/" + filepath.Join("img", i.keys[x]),
+            Width: i.vals[x].width,
+            Height: i.vals[x].height,
+        }
+        img.Src = strings.Replace(img.Src, "\\", "/", -1)
+
+        images = append(images, img)
+    }
+
+    return images
 }

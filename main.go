@@ -70,14 +70,13 @@ func main() {
 
     ready := make(chan bool)
     go watchThings(ready)
+
     if <-ready {
         fmt.Println("Watching things OK")
     } else {
         fmt.Println("Watching things NOT OK")
         return
     }
-
-    ImageCache.Dump()
 
     fmt.Println("Listening on address: " + s.Address)
     fmt.Println("Fisnished startup.")
@@ -101,11 +100,13 @@ func watchThings(ready chan bool) {
     }
     dataTree = make(map[string][]string)
 
+    fmt.Println("Scanning RemoteDirectory...")
     for _, d := range dir {
         base := filepath.Base(d)
         if strings.HasPrefix(base, ".") {
             continue
         }
+        fmt.Printf("[%s] %s\n", base, Games.Get(base))
 
         disc, err := discoverDir(d)
         if err != nil {
@@ -114,25 +115,18 @@ func watchThings(ready chan bool) {
         }
         dataTree[base] = disc
 
-        for _, imagefile := range disc {
-            img, err := readImage(imagefile)
-            if err != nil {
-                fmt.Println(err)
-                continue
-            }
+        imglist, err := ParseImages(d)
 
-            if err := ImageCache.Add(imagefile, img); err != nil {
-                fmt.Println(err)
-                ready <- false
-                return
-            }
+        if err := ImageCache.Merge(imglist); err != nil {
+            fmt.Println(err)
+            ready <- false
+            return
         }
 
         w, err := fsnotify.NewWatcher()
         if err != nil {
             fmt.Printf("Unable to create watch for %q: %s\n", base, err)
             ready <- false
-            return
         }
 
         if err := w.Add(filepath.Join(d, "screenshots")); err != nil {

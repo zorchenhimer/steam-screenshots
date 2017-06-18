@@ -2,6 +2,7 @@ package main
 
 import (
     "fmt"
+    "html/template"
     "net/http"
     "path/filepath"
     "sort"
@@ -51,6 +52,7 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
     //keys := GetKeys(root)
     keys := GetKeys(dataTree)
 
+    // Game page
     if r.URL.Path != "/" {
         trimmed := strings.Trim(r.URL.Path, "/")
         if SliceContains(keys, trimmed) {
@@ -67,7 +69,8 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
                 "Text":     pretty,
                 "Count":    fmt.Sprintf("%d", len(files)),
             }
-            d.Body = []map[string]string{}
+            d.Body = []map[string]template.JS{}
+            d.ImageMetadata = ImageCache.GetMetadata(trimmed)
 
             for idx, filename := range files {
                 base := filepath.Base(filename)
@@ -76,12 +79,13 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
                     clearclass = " clearme"
                     //fmt.Printf("Clearme on %q\n", base)
                 }
-                
-                d.Body = append(d.Body, map[string]string{
-                    "ImageTarget":  "/img/" + trimmed + "/" + base,
-                    "ThumbnailSrc": "/thumb/" + trimmed + "/" + base,
-                    "Text":         base,
-                    "Clear":        clearclass,
+
+                d.Body = append(d.Body, map[string]template.JS{
+                    "ImageTarget":  template.JS("/img/" + trimmed + "/" + base),
+                    "ThumbnailSrc": template.JS("/thumb/" + trimmed + "/" + base),
+                    "Text":         template.JS(base),
+                    "Clear":        template.JS(clearclass),
+                    "Idx":          template.JS(fmt.Sprintf("%d", idx)),
                 })
             }
 
@@ -90,12 +94,13 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
                 fmt.Println(err)
             }
         }
+
+    // Main page
     } else {
-        //sort.Strings(keys)
         gameNames := map[string]string{}
 
         d := TemplateData{}
-        d.Body = []map[string]string{}
+        d.Body = []map[string]template.JS{}
         for _, k := range keys {
             pretty, err := getGameName(k)
             if err != nil {
@@ -115,14 +120,13 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
             clearclass := ""
             if idx % 3 == 0 {
                 clearclass = " clearme"
-                //fmt.Printf("Clearme on %q\n", pretty)
             }
             appid := gameNames[pretty]
-            d.Body = append(d.Body, map[string]string{
-                "Target":   "/" + appid + "/",
-                "Pretty":   pretty,
-                "Count":    fmt.Sprintf("%d", len(dataTree[appid])),
-                "Clear":    clearclass,
+            d.Body = append(d.Body, map[string]template.JS{
+                "Target":   template.JS("/" + appid + "/"),
+                "Pretty":   template.JS(pretty),
+                "Count":    template.JS(fmt.Sprintf("%d", len(dataTree[appid]))),
+                "Clear":    template.JS(clearclass),
             })
         }
 
@@ -203,14 +207,25 @@ func handler_banner(w http.ResponseWriter, r *http.Request) {
 }
 
 func handler_static(w http.ResponseWriter, r *http.Request) {
+    if strings.HasSuffix(r.URL.Path, "/") {
+        fmt.Printf("[handler_static] attempted to get directory: %s\n", r.URL.Path)
+        http.NotFound(w, r)
+        return
+    }
+
     split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 
-    if len(split) != 2 {
+    // The three-length paths are for the PhotoSwipe gallery.
+    if len(split) != 2 && len(split) != 3 {
         fmt.Printf("[handler_static] split error: %s\n", split)
         return
     }
 
     fullPath := fmt.Sprintf("static/%s", split[1])
+    if len(split) == 3 {
+        fullPath = fmt.Sprintf("%s/%s", fullPath, split[2])
+    }
+
     if ex := exists(fullPath); ex {
         http.ServeFile(w, r, fullPath)
     } else {
