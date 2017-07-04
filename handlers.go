@@ -15,8 +15,6 @@ func (p StringSliceNoCase) Len() int           { return len(p) }
 func (p StringSliceNoCase) Less(i, j int) bool { return strings.ToLower(p[i]) < strings.ToLower(p[j]) }
 func (p StringSliceNoCase) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 
-var dataTree map[string][]string
-
 func SortKeysByValue(m map[string]string) []string {
     vals := []string{}
     for _, v := range m {

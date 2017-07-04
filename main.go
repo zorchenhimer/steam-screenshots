@@ -11,10 +11,9 @@ import (
     "regexp"
     //"strconv"
     "strings"
-    "sync"
+    //"sync"
     "time"
 
-    "github.com/fsnotify/fsnotify"
 )
 
 type Settings struct {
@@ -25,6 +24,9 @@ type Settings struct {
 type GameIDs map[string]string
 var Games *GameList
 var LastUpdate  *time.Time
+
+var dataTree map[string][]string
+//var dtLock sync.Mutex
 
 var s Settings
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
@@ -40,7 +42,6 @@ type steamapps struct {
 }
 
 func main() {
-    ImageCache = NewImageData()
 
     Games = NewGameList()
     if err := loadSettings(); err != nil {
@@ -68,35 +69,38 @@ func main() {
         MaxHeaderBytes: 1 << 20,
     }
 
-    ready := make(chan bool)
-    go watchThings(ready)
+    var err error
+    ImageCache, err = Load("image.cache")
+    if err != nil {
+        fmt.Println("Unable to load image.cache: ", err)
 
-    if <-ready {
-        fmt.Println("Watching things OK")
+        ImageCache = NewGameImages()
+        err = InitialScan()
+        if err != nil {
+            fmt.Println("Initial scan error: ", err)
+            return
+        }
     } else {
-        fmt.Println("Watching things NOT OK")
-        return
+        fmt.Println("Refreshing RemoteDirectory...")
+        if err = RefreshScan(true); err != nil {
+            fmt.Println("Error refreshing RemoteDirectory: ", err)
+            return
+        }
     }
+    fmt.Println("Initial scan OK")
+
+    // Needs to be wrapped in an anon func because it returns an error.
+    _ = time.AfterFunc(time.Minute, func(){RefreshScan(false)})
 
     fmt.Println("Listening on address: " + s.Address)
     fmt.Println("Fisnished startup.")
     server.ListenAndServe()
 }
 
-// Keep an eye on the directory and re-discover as needed.
-func watchThings(ready chan bool) {
-    type watcher struct {
-        base string
-        watch *fsnotify.Watcher
-    }
-    w_list := []watcher{}
-
-    // Initial discovery
+func InitialScan() error {
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
-        fmt.Println("Unable to glob RemoteDirectory: ", err)
-        ready <- false
-        return
+        return fmt.Errorf("Unable to glob RemoteDirectory: ", err)
     }
     dataTree = make(map[string][]string)
 
@@ -115,106 +119,60 @@ func watchThings(ready chan bool) {
         }
         dataTree[base] = disc
 
-        imglist, err := ParseImages(d)
-
-        if err := ImageCache.Merge(imglist); err != nil {
-            fmt.Println(err)
-            ready <- false
-            return
-        }
-
-        w, err := fsnotify.NewWatcher()
+        err = ImageCache.ScanPath(d)
         if err != nil {
-            fmt.Printf("Unable to create watch for %q: %s\n", base, err)
-            ready <- false
+            return err
         }
-
-        if err := w.Add(filepath.Join(d, "screenshots")); err != nil {
-            fmt.Printf("Unable to add dir to watch %q: %s\n", base, err)
-            ready <- false
-            return
-        }
-
-        w_list = append(w_list, watcher{base: base, watch: w})
     }
 
-    // Watch things to auto-discover them
-    w_root, err := fsnotify.NewWatcher()
-    if err != nil {
-        fmt.Println("Falied to create root watcher: ", err);
-        return
-    }
-    defer w_root.Close()
-
-    done := make(chan bool)
-    lock := sync.Mutex{}
-
-    // Root monitor.  Creates and deletes other monitors.
-    go func() {
-        for {
-            select {
-                case event := <-w_root.Events:
-                    if event.Op > 0 {
-                        fmt.Println("w_root event: ", event)
-                        if event.Op&fsnotify.Create == fsnotify.Create {
-                            fmt.Println("Create event")
-                            newdir := filepath.Base(event.Name)
-                            w, err := fsnotify.NewWatcher()
-                            if err != nil {
-                                fmt.Printf("Unable to create watcher for %q: %s\n", newdir, err)
-                                continue
-                            }
-
-                            if err := w.Add(filepath.Join(newdir, "screenshots")); err != nil {
-                                fmt.Printf("Unable to add dir to watch %q: %s\n", newdir, err)
-                                continue
-                            }
-
-                            lock.Lock()
-                            w_list = append(w_list, watcher{base: newdir, watch: w})
-                            lock.Unlock()
-                            fmt.Printf("New directory %q added to watch list\n", newdir)
-                        }
-                    }
-                case err := <-w_root.Errors:
-                    if err != nil {
-                        fmt.Println("w_root error: ", err)
-                    }
-            }
-        }
-    }()
-
-    // Directory monitor.
-    go func() {
-        for {
-            lock.Lock()
-            for _, w := range w_list {
-                select {
-                    case event := <-w.watch.Events:
-                        if event.Op > 0 {
-                            fmt.Printf("%s event: %s\n", w.base, event)
-                        }
-                    case err := <-w.watch.Errors:
-                        if err != nil {
-                            fmt.Printf("%s error: %s\n", w.base, err)
-                        }
-                }
-            }
-            lock.Unlock()
-            time.Sleep(100 * time.Millisecond)
-        }
-    }()
-
-    if err = w_root.Add(s.RemoteDirectory); err != nil {
-        fmt.Println("Unable to add root directory to w_root: ", err)
-        return
+    if err := ImageCache.Save("image.cache"); err != nil {
+        return fmt.Errorf("Unable to save image cache: %s\n", err)
     }
 
-    fmt.Printf("Watching directory %q\n", s.RemoteDirectory)
-    ready <- true
-    <-done
+    return nil
 }
 
+// FIXME: race conditions with dataTree and ImageCache
+func RefreshScan(bool printProgress) error {
+    dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
+    if err != nil {
+        fmt.Print("Unable to glob RemoteDirectory: ", err)
+        return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
+    }
+    dataTree = make(map[string][]string)
+
+    for _, d := range dir {
+        base := filepath.Base(d)
+        if strings.HasPrefix(base, ".") {
+            continue
+        }
+        if printProgress {
+            fmt.Printf("[%s] %s\n", base, Games.Get(base))
+        }
+
+        disc, err := discoverDir(d)
+        if err != nil {
+            fmt.Println(err)
+            continue
+        }
+        dataTree[base] = disc
+
+        err = ImageCache.RefreshPath(d)
+        if err != nil {
+            fmt.Println(err)
+            continue
+        }
+    }
+
+    if err := ImageCache.Save("image.cache"); err != nil {
+        return fmt.Errorf("Unable to save image cache: %s\n", err)
+    }
+
+    _ = time.AfterFunc(time.Minute, func() {RefreshScan(false)})
+    return nil
+}
+
+// TODO: remove the need for this.  Put it in GameImages.RefreshPath() or something.
 // Discover things in a single directory
 func discoverDir(dir string) ([]string, error) {
     found := []string{}
@@ -223,12 +181,6 @@ func discoverDir(dir string) ([]string, error) {
         return nil, fmt.Errorf("JPG glob error in %q: %s", dir, err)
     }
     found = append(found, jpg...)
-
-    //png, err := filepath.Glob(filepath.Join(dir, "screenshots", "*.png"))
-    //if err != nil {
-    //    return nil, fmt.Errorf("PNG glob error in %q: %s", dir, err)
-    //}
-    //found = append(found, png...)
 
     return found, nil
 }
