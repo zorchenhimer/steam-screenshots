@@ -21,11 +21,8 @@ type Settings struct {
     Address         string
 }
 
-type GameIDs map[string]string
-var Games *GameList
 var LastUpdate  *time.Time
 
-var dataTree map[string][]string
 //var dtLock sync.Mutex
 
 var s Settings
@@ -100,7 +97,7 @@ func main() {
 func InitialScan() error {
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
-        return fmt.Errorf("Unable to glob RemoteDirectory: ", err)
+        return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
     }
     dataTree = make(map[string][]string)
 

@@ -26,6 +26,7 @@ my @static = (
     'LICENSE.txt',
     'settings_example.json',
     'static/',
+    'static/default-skin/',
     'templates/',
     'banners/unknown.jpg',
 );

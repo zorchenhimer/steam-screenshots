@@ -14,10 +14,12 @@ import (
     "path/filepath"
     //"strconv"
     //"strings"
+    "sync"
     "time"
 )
 
 var ImageCache *GameImages
+var ImageLock *sync.Mutex = &sync.Mutex{}
 
 type GameImages struct {
     Games  map[string][]ImageMeta    // appid key
@@ -59,7 +61,9 @@ func (gi *GameImages) ScanPath(path string) (error) {
             continue
         }
 
-        ImageCache.Games[appid] = append(ImageCache.Games[appid], *meta)
+        ImageLock.Lock()
+        gi.Games[appid] = append(gi.Games[appid], *meta)
+        ImageLock.Unlock()
     }
 
     return nil
@@ -73,7 +77,9 @@ func (gi *GameImages) RefreshPath(path string) error {
     }
 
     // Make sure it's in the cache
+    ImageLock.Lock()
     meta, ok := gi.Games[appid]
+    ImageLock.Unlock()
     if !ok {
         // Add it if it isn't
         return gi.ScanPath(path)
@@ -95,7 +101,9 @@ func (gi *GameImages) RefreshPath(path string) error {
                     if newMeta, err := readImage(f); err != nil {
                         fmt.Println(err)
                     } else {
+                        ImageLock.Lock()
                         m = *newMeta
+                        ImageLock.Unlock()
                     }
                 }
                 continue OUTER
@@ -120,14 +128,16 @@ func readImage(fullpath string) (*ImageMeta, error) {
 
     fi, err := os.Stat(fullpath)
     if err != nil {
-        return nil, fmt.Errorf("Unable to stat %q: %s", err)
+        return nil, fmt.Errorf("Unable to stat %q: %s", fullpath, err)
     }
 
     return &ImageMeta{Name: filepath.Base(fullpath), Width: pt.X, Height: pt.Y, ModTime: fi.ModTime()}, nil
 }
 
 func (gi *GameImages) Save(filename string) (error) {
+    ImageLock.Lock()
     raw, err := json.Marshal(gi)
+    ImageLock.Unlock()
     if err != nil {
         return err
     }
@@ -178,6 +188,7 @@ func (gi *GameImages) GetMetadata(appid string) []Metadata {
         return nil
     }
 
+    ImageLock.Lock()
     for _, meta := range theGame {
         images = append(images, Metadata{
             Src:    fmt.Sprintf("/img/%s/%s", appid, meta.Name),
@@ -185,6 +196,7 @@ func (gi *GameImages) GetMetadata(appid string) []Metadata {
             Height: meta.Height,
         })
     }
+    ImageLock.Unlock()
 
     return images
 }
