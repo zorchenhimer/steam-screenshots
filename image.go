@@ -1,0 +1,190 @@
+package main
+
+// Cache image dimensions in a file
+
+import (
+    //"bufio"
+    "encoding/json"
+    "errors"
+    "fmt"
+    "image/jpeg"
+    //"io"
+    "io/ioutil"
+    "os"
+    "path/filepath"
+    //"strconv"
+    //"strings"
+    "time"
+)
+
+var ImageCache *GameImages
+
+type GameImages struct {
+    Games  map[string][]ImageMeta    // appid key
+}
+
+type ImageMeta struct {
+    Name    string      // filename base
+    ModTime time.Time
+    Width   int
+    Height  int
+}
+
+func (i ImageMeta) String() string {
+    return fmt.Sprintf("%s; %s; (%d, %d)", i.Name, i.ModTime, i.Width, i.Height)
+}
+
+func NewGameImages() *GameImages {
+    return &GameImages{Games: make(map[string][]ImageMeta)}
+}
+
+var NoMoreImages error = errors.New("No more images")
+var MismatchError error = errors.New("Mismatched key/val lengths")
+var NotImplementedError error = errors.New("Not implemented")
+
+// Initial scan stuff
+func (gi *GameImages) ScanPath(path string) (error) {
+    appid := filepath.Base(path)
+    dir, err := filepath.Glob(filepath.Join(path, "screenshots", "*.jpg"))
+    if err != nil {
+        return err
+    }
+
+    gi.Games[appid] = []ImageMeta{}
+
+    for _, f := range dir {
+        meta, err := readImage(f)
+        if err != nil {
+            fmt.Println(err)
+            continue
+        }
+
+        ImageCache.Games[appid] = append(ImageCache.Games[appid], *meta)
+    }
+
+    return nil
+}
+
+func (gi *GameImages) RefreshPath(path string) error {
+    appid := filepath.Base(path)
+    dir, err := filepath.Glob(filepath.Join(path, "screeshots", "*.jpg"))
+    if err != nil {
+        return err
+    }
+
+    // Make sure it's in the cache
+    meta, ok := gi.Games[appid]
+    if !ok {
+        // Add it if it isn't
+        return gi.ScanPath(path)
+    }
+
+    OUTER:
+    for _, f := range dir {
+        fi, err := os.Stat(f)
+        if err != nil {
+            // Remove image if it no longer exists
+            delete(gi.Games, appid)
+            continue
+        }
+
+        base := filepath.Base(f)
+        for _, m := range meta {
+            if m.Name == base {
+                if m.ModTime.Before(fi.ModTime()) {
+                    if newMeta, err := readImage(f); err != nil {
+                        fmt.Println(err)
+                    } else {
+                        m = *newMeta
+                    }
+                }
+                continue OUTER
+            }
+        }
+    }
+    return nil
+}
+
+func readImage(fullpath string) (*ImageMeta, error) {
+    file, err := os.Open(fullpath)
+    if err != nil {
+        return nil, fmt.Errorf("Unable to open %q: %s", fullpath, err)
+    }
+    defer file.Close()
+
+    img, err := jpeg.Decode(file)
+    if err != nil {
+        return nil, fmt.Errorf("Unable to decode %q: %s", fullpath, err)
+    }
+    pt := img.Bounds().Max
+
+    fi, err := os.Stat(fullpath)
+    if err != nil {
+        return nil, fmt.Errorf("Unable to stat %q: %s", err)
+    }
+
+    return &ImageMeta{Name: filepath.Base(fullpath), Width: pt.X, Height: pt.Y, ModTime: fi.ModTime()}, nil
+}
+
+func (gi *GameImages) Save(filename string) (error) {
+    raw, err := json.Marshal(gi)
+    if err != nil {
+        return err
+    }
+
+    if err = ioutil.WriteFile(filename, raw, 777); err != nil {
+        return err
+    }
+
+    return nil
+}
+
+func Load(filename string) (*GameImages, error) {
+    raw, err := ioutil.ReadFile(filename)
+    if err != nil {
+        return nil, err
+    }
+
+    i := NewGameImages()
+    if err := json.Unmarshal(raw, i); err != nil {
+        return nil, err
+    }
+
+    return i, nil
+}
+
+func (gi *GameImages) Dump() {
+    fmt.Println("Duming ImageCache")
+    for g, ms := range gi.Games { 
+        fmt.Println(g)
+        for _, m := range ms {
+            fmt.Println("  ", m)
+        }
+    }
+}
+
+type Metadata struct {
+    Src     string `json:"src"`
+    Width   int `json:"w"`
+    Height  int `json:"h"`
+}
+
+func (gi *GameImages) GetMetadata(appid string) []Metadata {
+    images := []Metadata{}
+
+    theGame, ok := gi.Games[appid]
+    if !ok {
+        fmt.Printf("[GetMetadata] Unable to find game with appid %s\n", appid)
+        return nil
+    }
+
+    for _, meta := range theGame {
+        images = append(images, Metadata{
+            Src:    fmt.Sprintf("/img/%s/%s", appid, meta.Name),
+            Width:  meta.Width,
+            Height: meta.Height,
+        })
+    }
+
+    return images
+}

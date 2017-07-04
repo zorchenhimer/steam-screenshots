@@ -9,9 +9,10 @@ import (
 var templates map[string]*template.Template
 
 type TemplateData struct {
-    Title   string
-    Header  map[string]string
-    Body    []map[string]string
+    Title           string
+    Header          map[string]string
+    Body            []map[string]template.JS
+    ImageMetadata   []Metadata
 }
 
 func init_templates() error {

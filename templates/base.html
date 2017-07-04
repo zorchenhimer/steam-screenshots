@@ -2,6 +2,10 @@
 <html>
     <head>
     <title>{{ block "title" .Title}}{{end}}Steam Screenshots</title>
+    {{ if .ImageMetadata }}
+    <link rel="stylesheet" href="/static/photoswipe.css" type="text/css" />
+    <link rel="stylesheet" href="/static/default-skin/default-skin.css" type="text/css" />
+    {{ end }}
     <style>
         .body {
             /*background-image: url("static/bg-repeat.png");
@@ -118,5 +122,8 @@
         <div id="container">
         {{ block "body" .Body }}{{end}}
         </div>
+        {{ if .ImageMetadata }}
+            {{ block "photoswipe" .ImageMetadata }}{{end}}
+        {{ end }}
     </body>
 </html>{{end}}

@@ -11,8 +11,9 @@ import (
     "regexp"
     //"strconv"
     "strings"
-    "sync"
+    //"sync"
     "time"
+
 )
 
 type Settings struct {
@@ -23,6 +24,9 @@ type Settings struct {
 type GameIDs map[string]string
 var Games *GameList
 var LastUpdate  *time.Time
+
+var dataTree map[string][]string
+//var dtLock sync.Mutex
 
 var s Settings
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
@@ -37,63 +41,8 @@ type steamapps struct {
     }   `json:"applist"`
 }
 
-type GameList struct {
-    games   GameIDs
-    m       sync.Mutex
-}
-
-func NewGameList() *GameList {
-    return &GameList{
-        games:  make(map[string]string),
-    }
-}
-
-func (g *GameList) Get(id string) string {
-    g.m.Lock()
-    defer g.m.Unlock()
-
-    if val, ok := g.games[id]; ok {
-        return val
-    }
-    return id
-}
-
-func (g *GameList) Set(id, val string) string {
-    g.m.Lock()
-    defer g.m.Unlock()
-
-    g.games[id] = val
-    return val
-}
-
-func (g *GameList) Update(list GameIDs) {
-    g.m.Lock()
-    defer g.m.Unlock()
-
-    for key, val := range list {
-        g.games[key] = val
-    }
-}
-
-func (g *GameList) GetMap() GameIDs {
-    g.m.Lock()
-    defer g.m.Unlock()
-
-    retList := GameIDs{}
-    for key, val := range g.games {
-        retList[key] = val
-    }
-    return retList
-}
-
-func (g *GameList) Length() int {
-    g.m.Lock()
-    defer g.m.Unlock()
-
-    return len(g.games)
-}
-
 func main() {
+
     Games = NewGameList()
     if err := loadSettings(); err != nil {
         fmt.Printf("Error loading settings: %s\n", err)
@@ -120,41 +69,118 @@ func main() {
         MaxHeaderBytes: 1 << 20,
     }
 
+    var err error
+    ImageCache, err = Load("image.cache")
+    if err != nil {
+        fmt.Println("Unable to load image.cache: ", err)
+
+        ImageCache = NewGameImages()
+        err = InitialScan()
+        if err != nil {
+            fmt.Println("Initial scan error: ", err)
+            return
+        }
+    } else {
+        fmt.Println("Refreshing RemoteDirectory...")
+        if err = RefreshScan(true); err != nil {
+            fmt.Println("Error refreshing RemoteDirectory: ", err)
+            return
+        }
+    }
+    fmt.Println("Initial scan OK")
+
+    // Needs to be wrapped in an anon func because it returns an error.
+    _ = time.AfterFunc(time.Minute, func(){RefreshScan(false)})
+
+    fmt.Println("Listening on address: " + s.Address)
     fmt.Println("Fisnished startup.")
     server.ListenAndServe()
 }
 
-// Returns a list of folders that have screenshot directories
-func discover() (map[string][]string, error) {
-    loadSettings()
-
+func InitialScan() error {
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
-        return nil, fmt.Errorf("Error Globbing: %s", err)
+        return fmt.Errorf("Unable to glob RemoteDirectory: ", err)
     }
+    dataTree = make(map[string][]string)
 
-    found := map[string][]string{}
-
+    fmt.Println("Scanning RemoteDirectory...")
     for _, d := range dir {
-        if strings.HasPrefix(filepath.Base(d), ".") {
+        base := filepath.Base(d)
+        if strings.HasPrefix(base, ".") {
             continue
         }
+        fmt.Printf("[%s] %s\n", base, Games.Get(base))
 
-        dfound := []string{}
-        jpg, err := filepath.Glob(filepath.Join(d, "screenshots", "*.jpg"))
-        if err == nil {
-            dfound = append(dfound, jpg...)
+        disc, err := discoverDir(d)
+        if err != nil {
+            fmt.Println(err)
+            continue
         }
+        dataTree[base] = disc
 
-        png, err := filepath.Glob(filepath.Join(d, "screenshots", "*.png"))
-        if err == nil {
-            dfound = append(dfound, png...)
-        }
-
-        if len(dfound) > 0 {
-            found[filepath.Base(d)] = dfound
+        err = ImageCache.ScanPath(d)
+        if err != nil {
+            return err
         }
     }
+
+    if err := ImageCache.Save("image.cache"); err != nil {
+        return fmt.Errorf("Unable to save image cache: %s\n", err)
+    }
+
+    return nil
+}
+
+// FIXME: race conditions with dataTree and ImageCache
+func RefreshScan(printProgress bool) error {
+    dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
+    if err != nil {
+        fmt.Print("Unable to glob RemoteDirectory: ", err)
+        return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
+    }
+    dataTree = make(map[string][]string)
+
+    for _, d := range dir {
+        base := filepath.Base(d)
+        if strings.HasPrefix(base, ".") {
+            continue
+        }
+        if printProgress {
+            fmt.Printf("[%s] %s\n", base, Games.Get(base))
+        }
+
+        disc, err := discoverDir(d)
+        if err != nil {
+            fmt.Println(err)
+            continue
+        }
+        dataTree[base] = disc
+
+        err = ImageCache.RefreshPath(d)
+        if err != nil {
+            fmt.Println(err)
+            continue
+        }
+    }
+
+    if err := ImageCache.Save("image.cache"); err != nil {
+        return fmt.Errorf("Unable to save image cache: %s\n", err)
+    }
+
+    _ = time.AfterFunc(time.Minute, func() {RefreshScan(false)})
+    return nil
+}
+
+// TODO: remove the need for this.  Put it in GameImages.RefreshPath() or something.
+// Discover things in a single directory
+func discoverDir(dir string) ([]string, error) {
+    found := []string{}
+    jpg, err := filepath.Glob(filepath.Join(dir, "screenshots", "*.jpg"))
+    if err != nil {
+        return nil, fmt.Errorf("JPG glob error in %q: %s", dir, err)
+    }
+    found = append(found, jpg...)
 
     return found, nil
 }
@@ -193,6 +219,9 @@ func loadSettings() error {
         return fmt.Errorf("Error unmarshaling settings: %s", err)
     }
 
+    fmt.Println("Settings loaded")
+
+    //updateGamesJson("")
     return loadGames()
 }
 
@@ -216,6 +245,7 @@ func loadGames() error {
     }
 
     Games.Update(games)
+    //fmt.Println("Number of games loaded: ", Games.Length())
     return nil
 }
 
