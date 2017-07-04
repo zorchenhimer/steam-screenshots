@@ -133,7 +133,7 @@ func InitialScan() error {
 }
 
 // FIXME: race conditions with dataTree and ImageCache
-func RefreshScan(bool printProgress) error {
+func RefreshScan(printProgress bool) error {
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
         fmt.Print("Unable to glob RemoteDirectory: ", err)
