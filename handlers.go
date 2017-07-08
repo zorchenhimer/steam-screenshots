@@ -131,7 +131,7 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
             d.Body = append(d.Body, map[string]template.JS{
                 "Target":   template.JS("/" + appid + "/"),
                 "Pretty":   template.JS(pretty),
-                "Count":    template.JS(fmt.Sprintf("%d", ImageCache.Count())),
+                "Count":    template.JS(fmt.Sprintf("%d", ImageCache.Count(appid))),
                 "Clear":    template.JS(clearclass),
             })
         }

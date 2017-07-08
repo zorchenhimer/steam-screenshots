@@ -173,10 +173,10 @@ func (gi *GameImages) Dump() {
     }
 }
 
-func (gi *GameImages) Count() int {
+func (gi *GameImages) Count(appid string) int {
     ImageLock.Lock()
     defer ImageLock.Unlock()
-    return len(gi.Games)
+    return len(gi.Games[appid])
 }
 
 type Metadata struct {
