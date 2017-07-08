@@ -173,6 +173,12 @@ func (gi *GameImages) Dump() {
     }
 }
 
+func (gi *GameImages) Count() int {
+    ImageLock.Lock()
+    defer ImageLock.Unlock()
+    return len(gi.Games)
+}
+
 type Metadata struct {
     Src     string `json:"src"`
     Width   int `json:"w"`

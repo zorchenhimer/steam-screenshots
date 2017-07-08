@@ -11,10 +11,13 @@ import (
     "regexp"
     //"strconv"
     "strings"
-    //"sync"
+    "sync"
     "time"
 
 )
+
+var dataTree map[string][]string
+var DataLock *sync.Mutex = &sync.Mutex{}
 
 type Settings struct {
     RemoteDirectory string
@@ -99,7 +102,7 @@ func InitialScan() error {
     if err != nil {
         return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
     }
-    dataTree = make(map[string][]string)
+    tmpTree := make(map[string][]string)
 
     fmt.Println("Scanning RemoteDirectory...")
     for _, d := range dir {
@@ -114,7 +117,7 @@ func InitialScan() error {
             fmt.Println(err)
             continue
         }
-        dataTree[base] = disc
+        tmpTree[base] = disc
 
         err = ImageCache.ScanPath(d)
         if err != nil {
@@ -126,17 +129,20 @@ func InitialScan() error {
         return fmt.Errorf("Unable to save image cache: %s\n", err)
     }
 
+    DataLock.Lock()
+    dataTree = tmpTree
+    DataLock.Unlock()
+
     return nil
 }
 
-// FIXME: race conditions with dataTree and ImageCache
 func RefreshScan(printProgress bool) error {
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
         fmt.Print("Unable to glob RemoteDirectory: ", err)
         return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
     }
-    dataTree = make(map[string][]string)
+    tmpTree := make(map[string][]string)
 
     for _, d := range dir {
         base := filepath.Base(d)
@@ -152,7 +158,7 @@ func RefreshScan(printProgress bool) error {
             fmt.Println(err)
             continue
         }
-        dataTree[base] = disc
+        tmpTree[base] = disc
 
         err = ImageCache.RefreshPath(d)
         if err != nil {
@@ -164,6 +170,10 @@ func RefreshScan(printProgress bool) error {
     if err := ImageCache.Save("image.cache"); err != nil {
         return fmt.Errorf("Unable to save image cache: %s\n", err)
     }
+
+    DataLock.Lock()
+    dataTree = tmpTree
+    DataLock.Unlock()
 
     _ = time.AfterFunc(time.Minute, func() {RefreshScan(false)})
     return nil

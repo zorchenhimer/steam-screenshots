@@ -48,13 +48,21 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
     //}
 
     //keys := GetKeys(root)
+    DataLock.Lock()
     keys := GetKeys(dataTree)
+    DataLock.Unlock()
 
     // Game page
     if r.URL.Path != "/" {
         trimmed := strings.Trim(r.URL.Path, "/")
         if SliceContains(keys, trimmed) {
-            files := dataTree[trimmed]
+            imageMeta := ImageCache.GetMetadata(trimmed)
+
+            files := []string{}
+            for _, m := range imageMeta {
+                files = append(files, m.Src)
+            }
+
             sort.Strings(files)
             pretty, err := getGameName(trimmed)
             if err != nil {
@@ -68,7 +76,7 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
                 "Count":    fmt.Sprintf("%d", len(files)),
             }
             d.Body = []map[string]template.JS{}
-            d.ImageMetadata = ImageCache.GetMetadata(trimmed)
+            d.ImageMetadata = imageMeta
 
             for idx, filename := range files {
                 base := filepath.Base(filename)
@@ -123,7 +131,7 @@ func handler_main(w http.ResponseWriter, r *http.Request) {
             d.Body = append(d.Body, map[string]template.JS{
                 "Target":   template.JS("/" + appid + "/"),
                 "Pretty":   template.JS(pretty),
-                "Count":    template.JS(fmt.Sprintf("%d", len(dataTree[appid]))),
+                "Count":    template.JS(fmt.Sprintf("%d", ImageCache.Count())),
                 "Clear":    template.JS(clearclass),
             })
         }

@@ -5,8 +5,6 @@ import (
 
 )
 
-var dataTree map[string][]string
-
 // GameIDs maps appids to display names
 var Games *GameList
 type GameIDs map[string]string
