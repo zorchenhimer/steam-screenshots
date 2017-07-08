@@ -1,4 +1,13 @@
 {
     "RemoteDirectory": "C:/path/to/steam/remote/folder",
-    "Address": ":8080"
+    "Address": ":8080",
+    "AppidOverrides": [
+        {
+            "id": "231410",
+            "name": "Kerbal Space Program Demo"
+        }, {
+            "id": "33440",
+            "name": "Driver San Francisco"
+        }
+    ]
 }

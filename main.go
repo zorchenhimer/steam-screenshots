@@ -22,6 +22,10 @@ var DataLock *sync.Mutex = &sync.Mutex{}
 type Settings struct {
     RemoteDirectory string
     Address         string
+    AppidOverrides  []struct {
+        Appid       string  `json:"id"`
+        Name        string  `json:"name"`
+    }
 }
 
 var LastUpdate  *time.Time
@@ -314,6 +318,11 @@ func updateGamesJson() error {
         id := fmt.Sprintf("%d", a.Appid)
         Games.Set(id, a.Name)
 
+    }
+
+    for _, ovr := range s.AppidOverrides {
+        Games.Set(ovr.Appid, ovr.Name)
+        fmt.Printf("Setting override for [%s]: %q\n", ovr.Appid, ovr.Name)
     }
 
     // save games.cache
