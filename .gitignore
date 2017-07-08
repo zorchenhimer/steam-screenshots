@@ -8,6 +8,7 @@ games.json
 PhotoSwipe-master/
 builds/
 data/
+tmp/
 
 # Linux binary
 steam-screenshots
