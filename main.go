@@ -233,14 +233,14 @@ func loadSettings() error {
 }
 
 func loadGames() error {
-    if ex := exists("games.json"); !ex {
-        fmt.Println("games.json doesn't exist.  Getting a new one.")
+    if ex := exists("games.cache"); !ex {
+        fmt.Println("games.cache doesn't exist.  Getting a new one.")
         if err := updateGamesJson(); err != nil {
             return fmt.Errorf("Unable update game list: %s", err)
         }
     }
 
-    gamesFile, err := ioutil.ReadFile("games.json")
+    gamesFile, err := ioutil.ReadFile("games.cache")
     if err != nil {
         return fmt.Errorf("Error reading games file: %s", err)
     }
@@ -316,16 +316,16 @@ func updateGamesJson() error {
 
     }
 
-    // save games.json
+    // save games.cache
     games := Games.GetMap()
-    marshaled, err := json.MarshalIndent(games, "", "  ")
+    marshaled, err := json.Marshal(games)
     if err != nil {
         return fmt.Errorf("Unable to marshal game json: %s", err)
     }
 
-    err = ioutil.WriteFile("games.json", marshaled, 0777)
+    err = ioutil.WriteFile("games.cache", marshaled, 0777)
     if err != nil {
-        return fmt.Errorf("Unable to save games.json: %s", err)
+        return fmt.Errorf("Unable to save games.cache: %s", err)
     }
 
     fmt.Printf("Finished updating games list.  Appids: %d\n", len(games))
