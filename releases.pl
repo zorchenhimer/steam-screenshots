@@ -60,7 +60,7 @@ foreach my $o (@OS) {
 
         print "Building ${o}/${a}\n";
         my $bin = "${binary}_v${version}_${o}_${a}";
-        `go build -o tmp/${bin}${ext}`;
+        `go build -o tmp/${binary}${ext}`;
 
         if ($o eq 'windows') {
             `7z a builds/${bin}.zip ./tmp/*`;
