@@ -1,0 +1,12 @@
+{{define "title"}}Debug - {{end}}
+
+{{define "header"}}
+<h1>Debug Status</h1>
+{{end}}
+
+{{define "body"}}
+<ul>
+    {{range .}}<li style="color:white">{{.Data}}</li>
+    {{end}}
+</ul>
+{{end}}

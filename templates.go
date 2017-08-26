@@ -19,6 +19,7 @@ func init_templates() error {
     template_list := []string{
         "main",
         "list",
+        "debug",
         //"edit",
     }
 

@@ -173,6 +173,12 @@ func (gi *GameImages) Dump() {
     }
 }
 
+func (gi *GameImages) Length() int {
+    ImageLock.Lock()
+    defer ImageLock.Unlock()
+    return len(gi.Games)
+}
+
 func (gi *GameImages) Count(appid string) int {
     ImageLock.Lock()
     defer ImageLock.Unlock()

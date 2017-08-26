@@ -35,6 +35,10 @@ var LastUpdate  *time.Time
 var s Settings
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
 
+// stats stuff
+var lastScan time.Time
+var startTime time.Time
+
 // Structure of json from steam's servers
 type steamapps struct {
     Applist struct {
@@ -46,6 +50,7 @@ type steamapps struct {
 }
 
 func main() {
+    startTime = time.Now()
 
     Games = NewGameList()
     if err := loadSettings(); err != nil {
@@ -64,6 +69,7 @@ func main() {
     mux.HandleFunc("/img/", handler_image)
     mux.HandleFunc("/banner/", handler_banner)
     mux.HandleFunc("/static/", handler_static)
+    mux.HandleFunc("/debug/", handler_debug)
 
     server := &http.Server{
         Addr:           s.Address,
@@ -102,6 +108,7 @@ func main() {
 }
 
 func InitialScan() error {
+    lastScan = time.Now()
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
         return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
@@ -145,6 +152,7 @@ func RefreshScan(printProgress bool) error {
         _ = time.AfterFunc(time.Minute, func() {RefreshScan(false)})
     }()
 
+    lastScan = time.Now()
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
         fmt.Print("Unable to glob RemoteDirectory: ", err)

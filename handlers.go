@@ -8,6 +8,7 @@ import (
     "sort"
     "strconv"
     "strings"
+    "time"
 )
 
 type StringSliceNoCase []string
@@ -236,5 +237,28 @@ func handler_static(w http.ResponseWriter, r *http.Request) {
         http.ServeFile(w, r, fullPath)
     } else {
         fmt.Printf("[handler_static] 404 on file %q\n", fullPath)
+    }
+}
+
+func handler_debug(w http.ResponseWriter, r *http.Request) {
+    d := TemplateData{}
+    d.Body = []map[string]template.JS{}
+
+    tmp := []string{
+        fmt.Sprintf("Last scan: %s", time.Since(lastScan)),
+        fmt.Sprintf("Uptime: %s", time.Since(startTime)),
+        fmt.Sprintf("Game cache count: %d", Games.Length()),
+        fmt.Sprintf("Game count: %d", ImageCache.Length()),
+    }
+
+    for _, s := range tmp {
+        d.Body = append(d.Body, map[string]template.JS{
+            "Data": template.JS(s),
+        })
+    }
+
+    err := renderTemplate(w, "debug", &d)
+    if err != nil {
+        fmt.Println(err)
     }
 }
