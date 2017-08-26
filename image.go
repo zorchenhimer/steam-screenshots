@@ -142,7 +142,7 @@ func (gi *GameImages) Save(filename string) (error) {
         return err
     }
 
-    if err = ioutil.WriteFile(filename, raw, 777); err != nil {
+    if err = ioutil.WriteFile(filename, raw, 664); err != nil {
         return err
     }
 
