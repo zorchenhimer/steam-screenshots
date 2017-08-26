@@ -6,7 +6,15 @@ use File::Copy qw(copy);
 
 local $ENV{PATH} = "$ENV{PATH};C:/Program Files/7-Zip";
 
-my $version = '1.2';
+my $githash = `git rev-parse HEAD`;
+chomp $githash;
+
+if (system("git diff --quiet HEAD --") != 0 ) {
+    $githash = 'DIRTY@'. $githash;
+}
+
+my $version = `git describe --abbrev=0 --tags`;
+chomp $version;
 my $binary = 'steam-screenshots';
 my @OS = (
     'windows',
@@ -59,8 +67,8 @@ foreach my $o (@OS) {
         $ENV{'GOARCH'} = $a;
 
         print "Building ${o}/${a}\n";
-        my $bin = "${binary}_v${version}_${o}_${a}";
-        `go build -o tmp/${binary}${ext}`;
+        my $bin = "${binary}_${version}_${o}_${a}";
+        `go build -ldflags "-X main.gitCommit=${githash} -X main.version=${version}" -o tmp/${binary}${ext}`;
 
         if ($o eq 'windows') {
             `7z a builds/${bin}.zip ./tmp/*`;

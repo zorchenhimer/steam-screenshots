@@ -38,6 +38,8 @@ var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
 // stats stuff
 var lastScan time.Time
 var startTime time.Time
+var gitCommit string
+var version string
 
 // Structure of json from steam's servers
 type steamapps struct {
@@ -50,6 +52,15 @@ type steamapps struct {
 }
 
 func main() {
+    if len(gitCommit) == 0 {
+        gitCommit = "Missing commit hash"
+    }
+
+    if len(version) == 0 {
+        version = "Missing version info"
+    }
+    fmt.Printf("%s@%s\n", version, gitCommit)
+
     startTime = time.Now()
 
     Games = NewGameList()

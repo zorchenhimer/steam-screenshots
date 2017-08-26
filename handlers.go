@@ -244,11 +244,21 @@ func handler_debug(w http.ResponseWriter, r *http.Request) {
     d := TemplateData{}
     d.Body = []map[string]template.JS{}
 
+    if len(gitCommit) == 0 {
+        gitCommit = "Missing commit hash"
+    }
+
+    if len(version) == 0 {
+        version = "Missing version info"
+    }
+
     tmp := []string{
         fmt.Sprintf("Last scan: %s", time.Since(lastScan)),
         fmt.Sprintf("Uptime: %s", time.Since(startTime)),
         fmt.Sprintf("Game cache count: %d", Games.Length()),
         fmt.Sprintf("Game count: %d", ImageCache.Length()),
+        fmt.Sprintf("Version: %s", version),
+        fmt.Sprintf("Commit: %s", gitCommit),
     }
 
     for _, s := range tmp {
