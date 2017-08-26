@@ -141,6 +141,10 @@ func InitialScan() error {
 }
 
 func RefreshScan(printProgress bool) error {
+    defer func() {
+        _ = time.AfterFunc(time.Minute, func() {RefreshScan(false)})
+    }()
+
     dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
     if err != nil {
         fmt.Print("Unable to glob RemoteDirectory: ", err)
@@ -179,7 +183,6 @@ func RefreshScan(printProgress bool) error {
     dataTree = tmpTree
     DataLock.Unlock()
 
-    _ = time.AfterFunc(time.Minute, func() {RefreshScan(false)})
     return nil
 }
 
