@@ -54,3 +54,11 @@ only want to allow local connections on port 8080 set this to `127.0.0.1:8080`.
  7. Detach the tmux or screen session (`Ctrl-b, d` for tmux, `Ctrl-a d` for
  screen)
 
+## License
+
+ Steam-screenshots is licensed under the MIT license.  See LICENSE.txt for the
+ full text.
+
+ PhotoSwipe is also licensed under the MIT license.  PhotoSwipe can be found
+ [here](https://github.com/dimsemenov/photoswipe).
+
