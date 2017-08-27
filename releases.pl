@@ -78,7 +78,7 @@ foreach my $o (@OS) {
             unlink "./builds/${bin}.tar";
         }
 
-        unlink "./tmp/${bin}${ext}";
+        unlink "./tmp/${binary}${ext}";
     }
 }
 
