@@ -238,6 +238,7 @@ func (s *Server) handler_static(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, fullPath)
 	} else {
 		fmt.Printf("[handler_static] 404 on file %q\n", fullPath)
+		http.NotFound(w, r)
 	}
 }
 
