@@ -3,22 +3,21 @@ package steamscreenshots
 // Cache image dimensions in a file
 
 import (
-	//"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"image/jpeg"
-	//"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	//"strconv"
-	//"strings"
 	"sync"
-	"time"
 )
 
-//var ImageCache *GameImages
+var (
+	NoMoreImages        error = errors.New("No more images")
+	MismatchError       error = errors.New("Mismatched key/val lengths")
+	NotImplementedError error = errors.New("Not implemented")
+)
 
 type GameImages struct {
 	Games map[string][]ImageMeta // appid key
@@ -26,14 +25,13 @@ type GameImages struct {
 }
 
 type ImageMeta struct {
-	Name    string // filename base
-	ModTime time.Time
-	Width   int
-	Height  int
+	Name   string // filename base
+	Width  int
+	Height int
 }
 
 func (i ImageMeta) String() string {
-	return fmt.Sprintf("%s; %s; (%d, %d)", i.Name, i.ModTime, i.Width, i.Height)
+	return fmt.Sprintf("%s; (%d, %d)", i.Name, i.Width, i.Height)
 }
 
 func NewGameImages() *GameImages {
@@ -43,14 +41,23 @@ func NewGameImages() *GameImages {
 	}
 }
 
-var (
-	NoMoreImages        error = errors.New("No more images")
-	MismatchError       error = errors.New("Mismatched key/val lengths")
-	NotImplementedError error = errors.New("Not implemented")
-)
+// Load cached image metadata from the given filename.
+func LoadImageCache(filename string) (*GameImages, error) {
+	raw, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	i := NewGameImages()
+	if err := json.Unmarshal(raw, i); err != nil {
+		return nil, err
+	}
+
+	return i, nil
+}
 
 // Initial scan stuff
-func (gi *GameImages) ScanPath(path string) error {
+func (gi *GameImages) ScanNewPath(path string) error {
 	appid := filepath.Base(path)
 	dir, err := filepath.Glob(filepath.Join(path, "screenshots", "*.jpg"))
 	if err != nil {
@@ -74,9 +81,10 @@ func (gi *GameImages) ScanPath(path string) error {
 	return nil
 }
 
-func (gi *GameImages) RefreshPath(path string) error {
+func (gi *GameImages) ScanPath(path string) error {
 	appid := filepath.Base(path)
-	dir, err := filepath.Glob(filepath.Join(path, "screeshots", "*.jpg"))
+
+	dir, err := filepath.Glob(filepath.Join(path, "screenshots", "*.jpg"))
 	if err != nil {
 		return err
 	}
@@ -87,31 +95,38 @@ func (gi *GameImages) RefreshPath(path string) error {
 	gi.lock.Unlock()
 	if !ok {
 		// Add it if it isn't
-		return gi.ScanPath(path)
+		return gi.ScanNewPath(path)
 	}
 
-OUTER:
 	for _, f := range dir {
-		fi, err := os.Stat(f)
+
+		// Remove image if it no longer exists.  Improper read permissions is treated as "not existing" here.
+		_, err := os.Stat(f)
 		if err != nil {
-			// Remove image if it no longer exists
 			delete(gi.Games, appid)
 			continue
 		}
 
+		// foreach image in directory
+		found := false
 		base := filepath.Base(f)
 		for _, m := range meta {
+
+			// match image filename
 			if m.Name == base {
-				if m.ModTime.Before(fi.ModTime()) {
-					if newMeta, err := readImage(f); err != nil {
-						fmt.Println(err)
-					} else {
-						gi.lock.Lock()
-						m = *newMeta
-						gi.lock.Unlock()
-					}
-				}
-				continue OUTER
+				found = true
+				break
+			}
+		}
+
+		// Add new images to the list
+		if !found {
+			if newImage, err := readImage(f); err != nil {
+				fmt.Println(err)
+			} else {
+				gi.lock.Lock()
+				gi.Games[appid] = append(gi.Games[appid], *newImage)
+				gi.lock.Unlock()
 			}
 		}
 	}
@@ -131,17 +146,22 @@ func readImage(fullpath string) (*ImageMeta, error) {
 	}
 	pt := img.Bounds().Max
 
-	fi, err := os.Stat(fullpath)
+	_, err = os.Stat(fullpath)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to stat %q: %s", fullpath, err)
 	}
 
-	return &ImageMeta{Name: filepath.Base(fullpath), Width: pt.X, Height: pt.Y, ModTime: fi.ModTime()}, nil
+	return &ImageMeta{
+		Name:   filepath.Base(fullpath),
+		Width:  pt.X,
+		Height: pt.Y,
+	}, nil
 }
 
 func (gi *GameImages) Save(filename string) error {
 	gi.lock.Lock()
-	raw, err := json.Marshal(gi)
+	//raw, err := json.Marshal(gi)
+	raw, err := json.MarshalIndent(gi, "", "  ")
 	gi.lock.Unlock()
 	if err != nil {
 		return err
@@ -152,20 +172,6 @@ func (gi *GameImages) Save(filename string) error {
 	}
 
 	return nil
-}
-
-func Load(filename string) (*GameImages, error) {
-	raw, err := ioutil.ReadFile(filename)
-	if err != nil {
-		return nil, err
-	}
-
-	i := NewGameImages()
-	if err := json.Unmarshal(raw, i); err != nil {
-		return nil, err
-	}
-
-	return i, nil
 }
 
 func (gi *GameImages) Dump() {

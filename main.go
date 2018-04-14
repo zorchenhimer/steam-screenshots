@@ -48,6 +48,7 @@ type Server struct {
 	lastUpdate *time.Time
 
 	settings Settings
+    // TODO: remove this.  Pretty sure this is duplicated info from ImageCache
 	dataTree map[string][]string
 	dataLock *sync.Mutex
 
@@ -96,131 +97,88 @@ func (s *Server) Run() {
 	}
 
 	var err error
-	s.ImageCache, err = Load("image.cache")
+	s.ImageCache, err = LoadImageCache("image.cache")
 	if err != nil {
 		fmt.Println("Unable to load image.cache: ", err)
 
 		s.ImageCache = NewGameImages()
-		err = s.InitialScan()
+		err = s.scan(true)
 		if err != nil {
 			fmt.Println("Initial scan error: ", err)
 			return
 		}
 	} else {
 		fmt.Println("Refreshing RemoteDirectory...")
-		if err = s.RefreshScan(true); err != nil {
+		if err = s.scan(true); err != nil {
 			fmt.Println("Error refreshing RemoteDirectory: ", err)
 			return
 		}
 	}
 	fmt.Println("Initial scan OK")
 
-	// Needs to be wrapped in an anon func because it returns an error.
-	_ = time.AfterFunc(time.Minute, func() { s.RefreshScan(false) })
+	// Fire and forget.  TODO: graceful shutdown
+	go func() {
+		time.Sleep(time.Minute)
+		if err := s.scan(false); err != nil {
+			fmt.Printf("Error scanning: %s", err)
+		}
+	}()
 
 	fmt.Println("Listening on address: " + s.settings.Address)
 	fmt.Println("Fisnished startup.")
 	server.ListenAndServe()
 }
 
-func (s *Server) InitialScan() error {
+func (s *Server) scan(printOutput bool) error {
 	s.lastScan = time.Now()
+
+	if printOutput {
+		fmt.Printf("Scanning %q\n", s.settings.RemoteDirectory)
+	}
+
 	dir, err := filepath.Glob(filepath.Join(s.settings.RemoteDirectory, "*"))
 	if err != nil {
 		return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
 	}
 	tmpTree := make(map[string][]string)
 
-	fmt.Println("Scanning RemoteDirectory...")
 	for _, d := range dir {
 		base := filepath.Base(d)
+
+		// Ignore dotfiles
 		if strings.HasPrefix(base, ".") {
 			continue
 		}
-		fmt.Printf("[%s] %s\n", base, s.Games.Get(base))
 
-		disc, err := discoverDir(d)
-		if err != nil {
-			fmt.Println(err)
-			continue
-		}
-		tmpTree[base] = disc
-
-		err = s.ImageCache.ScanPath(d)
-		if err != nil {
-			return err
-		}
-	}
-
-	if err := s.ImageCache.Save("image.cache"); err != nil {
-		return fmt.Errorf("Unable to save image cache: %s\n", err)
-	}
-
-	s.dataLock.Lock()
-	s.dataTree = tmpTree
-	s.dataLock.Unlock()
-
-	return nil
-}
-
-func (s *Server) RefreshScan(printProgress bool) error {
-	defer func() {
-		_ = time.AfterFunc(time.Minute, func() { s.RefreshScan(false) })
-	}()
-
-	s.lastScan = time.Now()
-	dir, err := filepath.Glob(filepath.Join(s.settings.RemoteDirectory, "*"))
-	if err != nil {
-		fmt.Print("Unable to glob RemoteDirectory: ", err)
-		return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
-	}
-	tmpTree := make(map[string][]string)
-
-	for _, d := range dir {
-		base := filepath.Base(d)
-		if strings.HasPrefix(base, ".") {
-			continue
-		}
-		if printProgress {
+		if printOutput {
 			fmt.Printf("[%s] %s\n", base, s.Games.Get(base))
 		}
 
-		disc, err := discoverDir(d)
+		jpg, err := filepath.Glob(filepath.Join(d, "screenshots", "*.jpg"))
 		if err != nil {
-			fmt.Println(err)
+			fmt.Printf("JPG glob error in %q: %s", d, err)
 			continue
 		}
-		tmpTree[base] = disc
+		tmpTree[base] = jpg
 
-		err = s.ImageCache.RefreshPath(d)
+		// TODO: merge ImageCache.ScanPath() and ImagePath.RefreshPath(), possibly removing the jpg glob above as well.
+		err = s.ImageCache.ScanPath(d)
 		if err != nil {
 			fmt.Println(err)
-			continue
 		}
 	}
 
-	if err := s.ImageCache.Save("image.cache"); err != nil {
-		return fmt.Errorf("Unable to save image cache: %s\n", err)
-	}
-
+	// Update in-memory cache
 	s.dataLock.Lock()
 	s.dataTree = tmpTree
 	s.dataLock.Unlock()
 
-	return nil
-}
-
-// TODO: remove the need for this.  Put it in GameImages.RefreshPath() or something.
-// Discover things in a single directory
-func discoverDir(dir string) ([]string, error) {
-	found := []string{}
-	jpg, err := filepath.Glob(filepath.Join(dir, "screenshots", "*.jpg"))
-	if err != nil {
-		return nil, fmt.Errorf("JPG glob error in %q: %s", dir, err)
+	// Write cache to disk after it's updated in-memory so failing this doesn't skip updating.
+	if err := s.ImageCache.Save("image.cache"); err != nil {
+		return fmt.Errorf("Unable to save image cache: %s\n", err)
 	}
-	found = append(found, jpg...)
 
-	return found, nil
+	return nil
 }
 
 func SliceContains(s []string, val string) bool {
