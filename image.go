@@ -1,4 +1,4 @@
-package main
+package steamscreenshots
 
 // Cache image dimensions in a file
 
@@ -18,11 +18,11 @@ import (
     "time"
 )
 
-var ImageCache *GameImages
-var ImageLock *sync.Mutex = &sync.Mutex{}
+//var ImageCache *GameImages
 
 type GameImages struct {
     Games  map[string][]ImageMeta    // appid key
+    lock *sync.Mutex
 }
 
 type ImageMeta struct {
@@ -37,12 +37,17 @@ func (i ImageMeta) String() string {
 }
 
 func NewGameImages() *GameImages {
-    return &GameImages{Games: make(map[string][]ImageMeta)}
+    return &GameImages{
+        Games: make(map[string][]ImageMeta),
+        lock: &sync.Mutex{},
+    }
 }
 
-var NoMoreImages error = errors.New("No more images")
-var MismatchError error = errors.New("Mismatched key/val lengths")
-var NotImplementedError error = errors.New("Not implemented")
+var (
+    NoMoreImages error = errors.New("No more images")
+    MismatchError error = errors.New("Mismatched key/val lengths")
+    NotImplementedError error = errors.New("Not implemented")
+)
 
 // Initial scan stuff
 func (gi *GameImages) ScanPath(path string) (error) {
@@ -61,9 +66,9 @@ func (gi *GameImages) ScanPath(path string) (error) {
             continue
         }
 
-        ImageLock.Lock()
+        gi.lock.Lock()
         gi.Games[appid] = append(gi.Games[appid], *meta)
-        ImageLock.Unlock()
+        gi.lock.Unlock()
     }
 
     return nil
@@ -77,9 +82,9 @@ func (gi *GameImages) RefreshPath(path string) error {
     }
 
     // Make sure it's in the cache
-    ImageLock.Lock()
+    gi.lock.Lock()
     meta, ok := gi.Games[appid]
-    ImageLock.Unlock()
+    gi.lock.Unlock()
     if !ok {
         // Add it if it isn't
         return gi.ScanPath(path)
@@ -101,9 +106,9 @@ func (gi *GameImages) RefreshPath(path string) error {
                     if newMeta, err := readImage(f); err != nil {
                         fmt.Println(err)
                     } else {
-                        ImageLock.Lock()
+                        gi.lock.Lock()
                         m = *newMeta
-                        ImageLock.Unlock()
+                        gi.lock.Unlock()
                     }
                 }
                 continue OUTER
@@ -135,9 +140,9 @@ func readImage(fullpath string) (*ImageMeta, error) {
 }
 
 func (gi *GameImages) Save(filename string) (error) {
-    ImageLock.Lock()
+    gi.lock.Lock()
     raw, err := json.Marshal(gi)
-    ImageLock.Unlock()
+    gi.lock.Unlock()
     if err != nil {
         return err
     }
@@ -174,14 +179,14 @@ func (gi *GameImages) Dump() {
 }
 
 func (gi *GameImages) Length() int {
-    ImageLock.Lock()
-    defer ImageLock.Unlock()
+    gi.lock.Lock()
+    defer gi.lock.Unlock()
     return len(gi.Games)
 }
 
 func (gi *GameImages) Count(appid string) int {
-    ImageLock.Lock()
-    defer ImageLock.Unlock()
+    gi.lock.Lock()
+    defer gi.lock.Unlock()
     return len(gi.Games[appid])
 }
 
@@ -200,7 +205,7 @@ func (gi *GameImages) GetMetadata(appid string) []Metadata {
         return nil
     }
 
-    ImageLock.Lock()
+    gi.lock.Lock()
     for _, meta := range theGame {
         images = append(images, Metadata{
             Src:    fmt.Sprintf("/img/%s/%s", appid, meta.Name),
@@ -208,7 +213,7 @@ func (gi *GameImages) GetMetadata(appid string) []Metadata {
             Height: meta.Height,
         })
     }
-    ImageLock.Unlock()
+    gi.lock.Unlock()
 
     return images
 }

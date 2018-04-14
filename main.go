@@ -1,4 +1,4 @@
-package main
+package steamscreenshots
 
 import (
     "encoding/json"
@@ -16,9 +16,6 @@ import (
 
 )
 
-var dataTree map[string][]string
-var DataLock *sync.Mutex = &sync.Mutex{}
-
 type Settings struct {
     RemoteDirectory string
     Address         string
@@ -28,18 +25,9 @@ type Settings struct {
     }
 }
 
-var LastUpdate  *time.Time
+//var LastUpdate  *time.Time
 
-//var dtLock sync.Mutex
-
-var s Settings
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
-
-// stats stuff
-var lastScan time.Time
-var startTime time.Time
-var gitCommit string
-var version string
 
 // Structure of json from steam's servers
 type steamapps struct {
@@ -51,20 +39,38 @@ type steamapps struct {
     }   `json:"applist"`
 }
 
-func main() {
-    if len(gitCommit) == 0 {
-        gitCommit = "Missing commit hash"
+type Server struct {
+    // stats stuff
+    startTime   time.Time
+    lastScan    time.Time
+    gitCommit   string
+    version     string
+
+    lastUpdate  *time.Time
+
+    settings    Settings
+    dataTree    map[string][]string
+    dataLock    *sync.Mutex
+
+    Games       *GameList
+    ImageCache  *GameImages
+}
+
+func (s *Server) Run() {
+    if len(s.gitCommit) == 0 {
+        s.gitCommit = "Missing commit hash"
     }
 
-    if len(version) == 0 {
-        version = "Missing version info"
+    if len(s.version) == 0 {
+        s.version = "Missing version info"
     }
-    fmt.Printf("%s@%s\n", version, gitCommit)
+    fmt.Printf("%s@%s\n", s.version, s.gitCommit)
 
-    startTime = time.Now()
+    s.startTime = time.Now()
+    s.dataLock = &sync.Mutex{}
 
-    Games = NewGameList()
-    if err := loadSettings(); err != nil {
+    s.Games = NewGameList()
+    if err := s.loadSettings(); err != nil {
         fmt.Printf("Error loading settings: %s\n", err)
         return
     }
@@ -75,15 +81,15 @@ func main() {
     }
 
     mux := http.NewServeMux()
-    mux.HandleFunc("/", handler_main)
-    mux.HandleFunc("/thumb/", handler_thumb)
-    mux.HandleFunc("/img/", handler_image)
-    mux.HandleFunc("/banner/", handler_banner)
-    mux.HandleFunc("/static/", handler_static)
-    mux.HandleFunc("/debug/", handler_debug)
+    mux.HandleFunc("/", s.handler_main)
+    mux.HandleFunc("/thumb/", s.handler_thumb)
+    mux.HandleFunc("/img/", s.handler_image)
+    mux.HandleFunc("/banner/", s.handler_banner)
+    mux.HandleFunc("/static/", s.handler_static)
+    mux.HandleFunc("/debug/", s.handler_debug)
 
     server := &http.Server{
-        Addr:           s.Address,
+        Addr:           s.settings.Address,
         Handler:        mux,
         ReadTimeout:    10 * time.Second,
         WriteTimeout:   10 * time.Second,
@@ -91,19 +97,19 @@ func main() {
     }
 
     var err error
-    ImageCache, err = Load("image.cache")
+    s.ImageCache, err = Load("image.cache")
     if err != nil {
         fmt.Println("Unable to load image.cache: ", err)
 
-        ImageCache = NewGameImages()
-        err = InitialScan()
+        s.ImageCache = NewGameImages()
+        err = s.InitialScan()
         if err != nil {
             fmt.Println("Initial scan error: ", err)
             return
         }
     } else {
         fmt.Println("Refreshing RemoteDirectory...")
-        if err = RefreshScan(true); err != nil {
+        if err = s.RefreshScan(true); err != nil {
             fmt.Println("Error refreshing RemoteDirectory: ", err)
             return
         }
@@ -111,16 +117,16 @@ func main() {
     fmt.Println("Initial scan OK")
 
     // Needs to be wrapped in an anon func because it returns an error.
-    _ = time.AfterFunc(time.Minute, func(){RefreshScan(false)})
+    _ = time.AfterFunc(time.Minute, func(){s.RefreshScan(false)})
 
-    fmt.Println("Listening on address: " + s.Address)
+    fmt.Println("Listening on address: " + s.settings.Address)
     fmt.Println("Fisnished startup.")
     server.ListenAndServe()
 }
 
-func InitialScan() error {
-    lastScan = time.Now()
-    dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
+func (s *Server) InitialScan() error {
+    s.lastScan = time.Now()
+    dir, err := filepath.Glob(filepath.Join(s.settings.RemoteDirectory, "*"))
     if err != nil {
         return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
     }
@@ -132,7 +138,7 @@ func InitialScan() error {
         if strings.HasPrefix(base, ".") {
             continue
         }
-        fmt.Printf("[%s] %s\n", base, Games.Get(base))
+        fmt.Printf("[%s] %s\n", base, s.Games.Get(base))
 
         disc, err := discoverDir(d)
         if err != nil {
@@ -141,30 +147,30 @@ func InitialScan() error {
         }
         tmpTree[base] = disc
 
-        err = ImageCache.ScanPath(d)
+        err = s.ImageCache.ScanPath(d)
         if err != nil {
             return err
         }
     }
 
-    if err := ImageCache.Save("image.cache"); err != nil {
+    if err := s.ImageCache.Save("image.cache"); err != nil {
         return fmt.Errorf("Unable to save image cache: %s\n", err)
     }
 
-    DataLock.Lock()
-    dataTree = tmpTree
-    DataLock.Unlock()
+    s.dataLock.Lock()
+    s.dataTree = tmpTree
+    s.dataLock.Unlock()
 
     return nil
 }
 
-func RefreshScan(printProgress bool) error {
+func (s *Server) RefreshScan(printProgress bool) error {
     defer func() {
-        _ = time.AfterFunc(time.Minute, func() {RefreshScan(false)})
+        _ = time.AfterFunc(time.Minute, func() {s.RefreshScan(false)})
     }()
 
-    lastScan = time.Now()
-    dir, err := filepath.Glob(filepath.Join(s.RemoteDirectory, "*"))
+    s.lastScan = time.Now()
+    dir, err := filepath.Glob(filepath.Join(s.settings.RemoteDirectory, "*"))
     if err != nil {
         fmt.Print("Unable to glob RemoteDirectory: ", err)
         return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
@@ -177,7 +183,7 @@ func RefreshScan(printProgress bool) error {
             continue
         }
         if printProgress {
-            fmt.Printf("[%s] %s\n", base, Games.Get(base))
+            fmt.Printf("[%s] %s\n", base, s.Games.Get(base))
         }
 
         disc, err := discoverDir(d)
@@ -187,20 +193,20 @@ func RefreshScan(printProgress bool) error {
         }
         tmpTree[base] = disc
 
-        err = ImageCache.RefreshPath(d)
+        err = s.ImageCache.RefreshPath(d)
         if err != nil {
             fmt.Println(err)
             continue
         }
     }
 
-    if err := ImageCache.Save("image.cache"); err != nil {
+    if err := s.ImageCache.Save("image.cache"); err != nil {
         return fmt.Errorf("Unable to save image cache: %s\n", err)
     }
 
-    DataLock.Lock()
-    dataTree = tmpTree
-    DataLock.Unlock()
+    s.dataLock.Lock()
+    s.dataTree = tmpTree
+    s.dataLock.Unlock()
 
     return nil
 }
@@ -236,7 +242,8 @@ func GetKeys(m map[string][]string) []string {
     return keys
 }
 
-func loadSettings() error {
+// FIXME: pass the filename in here as an argument
+func (s *Server) loadSettings() error {
     settingsFilename := "settings.json"
     if len(os.Args) > 1 {
         settingsFilename = os.Args[1]
@@ -247,7 +254,7 @@ func loadSettings() error {
         return fmt.Errorf("Error reading settings file: %s", err)
     }
 
-    err = json.Unmarshal(settingsFile, &s)
+    err = json.Unmarshal(settingsFile, &s.settings)
     if err != nil {
         return fmt.Errorf("Error unmarshaling settings: %s", err)
     }
@@ -255,13 +262,13 @@ func loadSettings() error {
     fmt.Println("Settings loaded")
 
     //updateGamesJson("")
-    return loadGames()
+    return s.loadGames()
 }
 
-func loadGames() error {
+func (s *Server) loadGames() error {
     if ex := exists("games.cache"); !ex {
         fmt.Println("games.cache doesn't exist.  Getting a new one.")
-        if err := updateGamesJson(); err != nil {
+        if err := s.updateGamesJson(); err != nil {
             return fmt.Errorf("Unable update game list: %s", err)
         }
     }
@@ -277,30 +284,30 @@ func loadGames() error {
         return fmt.Errorf("Error unmarshaling games: %s", err)
     }
 
-    Games.Update(games)
+    s.Games.Update(games)
     //fmt.Println("Number of games loaded: ", Games.Length())
     return nil
 }
 
-func getGameName(appid string) (string, error) {
+func (s *Server) getGameName(appid string) (string, error) {
     if appid == ".stfolder" {
         return appid, nil
     }
 
     //fmt.Printf("Getting name for appid %q\n", appid)
-    if name := Games.Get(appid); name != appid {
+    if name := s.Games.Get(appid); name != appid {
         return name, nil
     }
 
     // Large appid, must be a non-steam game.  This could have some edge cases
     // as non-steam games' appids are CRCs.
     if len(appid) > 18 {
-        return Games.Set(appid, fmt.Sprintf("Non-Steam game (%s)", appid)), nil
+        return s.Games.Set(appid, fmt.Sprintf("Non-Steam game (%s)", appid)), nil
     }
 
     // TODO: rate limiting/cache age
-    if err := updateGamesJson(); err == nil {
-        if name := Games.Get(appid); name != appid {
+    if err := s.updateGamesJson(); err == nil {
+        if name := s.Games.Get(appid); name != appid {
             return name, nil
         }
     }
@@ -308,8 +315,8 @@ func getGameName(appid string) (string, error) {
 }
 
 // Update the local cache of appids from steam's servers.
-func updateGamesJson() error {
-    if LastUpdate != nil && time.Since(*LastUpdate).Minutes() < 30 {
+func (s *Server) updateGamesJson() error {
+    if s.lastUpdate != nil && time.Since(*s.lastUpdate).Minutes() < 30 {
         //return fmt.Errorf("Cache still good.")
         fmt.Println("Not updating games list; cache still good.")
         return nil
@@ -317,7 +324,7 @@ func updateGamesJson() error {
 
     now := time.Now()
     //fmt.Printf("time.Now(): {}\n", now)
-    LastUpdate = &now
+    s.lastUpdate = &now
 
     fmt.Println("Updating games list")
     resp, err := http.Get("http://api.steampowered.com/ISteamApps/GetAppList/v2")
@@ -338,17 +345,17 @@ func updateGamesJson() error {
 
     for _, a := range alist.Applist.Apps {
         id := fmt.Sprintf("%d", a.Appid)
-        Games.Set(id, a.Name)
+        s.Games.Set(id, a.Name)
 
     }
 
-    for _, ovr := range s.AppidOverrides {
-        Games.Set(ovr.Appid, ovr.Name)
+    for _, ovr := range s.settings.AppidOverrides {
+        s.Games.Set(ovr.Appid, ovr.Name)
         fmt.Printf("Setting override for [%s]: %q\n", ovr.Appid, ovr.Name)
     }
 
     // save games.cache
-    games := Games.GetMap()
+    games := s.Games.GetMap()
     marshaled, err := json.Marshal(games)
     if err != nil {
         return fmt.Errorf("Unable to marshal game json: %s", err)
@@ -364,7 +371,7 @@ func updateGamesJson() error {
 }
 
 // Returns a filename
-func getGameBanner(appid uint64) (string, error) {
+func (s *Server) getGameBanner(appid uint64) (string, error) {
     appstr := fmt.Sprintf("%d", appid)
     if exist := exists("banners/" + appstr + ".jpg"); exist {
         return "banners/" + appstr + ".jpg", nil

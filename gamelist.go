@@ -1,12 +1,11 @@
-package main
+package steamscreenshots
 
 import (
     "sync"
-
 )
 
 // GameIDs maps appids to display names
-var Games *GameList
+//var Games *GameList
 type GameIDs map[string]string
 
 type GameList struct {
