@@ -1,10 +1,10 @@
 package main
 
 import (
-    ss "github.com/zorchenhimer/steam-screenshots"
+	ss "github.com/zorchenhimer/steam-screenshots"
 )
 
 func main() {
-    server := ss.Server{}
-    server.Run()
+	server := ss.Server{}
+	server.Run()
 }
