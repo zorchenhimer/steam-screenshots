@@ -121,9 +121,11 @@ func (s *Server) Run() {
 
 	// Fire and forget.  TODO: graceful shutdown
 	go func() {
-		time.Sleep(time.Minute)
-		if err := s.scan(false); err != nil {
-			fmt.Printf("Error scanning: %s", err)
+		for {
+			time.Sleep(time.Minute)
+			if err := s.scan(false); err != nil {
+				fmt.Printf("Error scanning: %s", err)
+			}
 		}
 	}()
 
