@@ -68,7 +68,7 @@ foreach my $o (@OS) {
 
         print "Building ${o}/${a}\n";
         my $bin = "${binary}_${version}_${o}_${a}";
-        `go build -ldflags "-X main.gitCommit=${githash} -X main.version=${version}" -o tmp/${binary}${ext}`;
+        `go build -ldflags "-X github.com/zorchenhimer/steam-screenshots.gitCommit=${githash} -X github.com/zorchenhimer/steam-screenshots.version=${version}" -o tmp/${binary}${ext} cmd/main.go`;
 
         if ($o eq 'windows') {
             `7z a builds/${bin}.zip ./tmp/*`;

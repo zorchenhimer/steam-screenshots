@@ -28,6 +28,11 @@ type Settings struct {
 
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
 
+var (
+	gitCommit string
+	version   string
+)
+
 // Structure of json from steam's servers
 type steamapps struct {
 	Applist struct {
@@ -42,13 +47,11 @@ type Server struct {
 	// stats stuff
 	startTime time.Time
 	lastScan  time.Time
-	gitCommit string
-	version   string
 
 	lastUpdate *time.Time
 
 	settings Settings
-    // TODO: remove this.  Pretty sure this is duplicated info from ImageCache
+	// TODO: remove this.  Pretty sure this is duplicated info from ImageCache
 	dataTree map[string][]string
 	dataLock *sync.Mutex
 
@@ -57,14 +60,14 @@ type Server struct {
 }
 
 func (s *Server) Run() {
-	if len(s.gitCommit) == 0 {
-		s.gitCommit = "Missing commit hash"
+	if len(gitCommit) == 0 {
+		gitCommit = "Missing commit hash"
 	}
 
-	if len(s.version) == 0 {
-		s.version = "Missing version info"
+	if len(version) == 0 {
+		version = "Missing version info"
 	}
-	fmt.Printf("%s@%s\n", s.version, s.gitCommit)
+	fmt.Printf("%s@%s\n", version, gitCommit)
 
 	s.startTime = time.Now()
 	s.dataLock = &sync.Mutex{}

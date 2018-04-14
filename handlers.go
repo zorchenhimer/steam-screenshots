@@ -245,12 +245,12 @@ func (s *Server) handler_debug(w http.ResponseWriter, r *http.Request) {
 	d := TemplateData{}
 	d.Body = []map[string]template.JS{}
 
-	if len(s.gitCommit) == 0 {
-		s.gitCommit = "Missing commit hash"
+	if len(gitCommit) == 0 {
+		gitCommit = "Missing commit hash"
 	}
 
-	if len(s.version) == 0 {
-		s.version = "Missing version info"
+	if len(version) == 0 {
+		version = "Missing version info"
 	}
 
 	tmp := []string{
@@ -258,8 +258,8 @@ func (s *Server) handler_debug(w http.ResponseWriter, r *http.Request) {
 		fmt.Sprintf("Uptime: %s", time.Since(s.startTime)),
 		fmt.Sprintf("Game cache count: %d", s.Games.Length()),
 		fmt.Sprintf("Game count: %d", s.ImageCache.Length()),
-		fmt.Sprintf("Version: %s", s.version),
-		fmt.Sprintf("Commit: %s", s.gitCommit),
+		fmt.Sprintf("Version: %s", version),
+		fmt.Sprintf("Commit: %s", gitCommit),
 	}
 
 	for _, s := range tmp {
