@@ -10,17 +10,33 @@ all the screenshots, and the second is the address to listen on.
 
 ```json
 {
-    "RemoteDirectory": "C:/Program Files (x86)/Steam/userdata/<user directory>/760/remote/",
-    "Address":  ":8080"
+    "Address": ":8080",
+    "AppidOverrides": [
+        {
+            "id": "231410",
+            "name": "Kerbal Space Program Demo"
+        }, {
+            "id": "33440",
+            "name": "Driver San Francisco"
+        }
+    ],
+    "RemoteDirectory": "C:/path/to/steam/remote/folder",
+    "RefreshInterval": 10
 }
 ```
+
+The `Address` setting is simply the address to listen on.  For example, if you
+only want to allow local connections on port 8080 set this to `127.0.0.1:8080`.
+
+`AppidOverrides` is a list of id's and names to override a game's name.
 
 The `RemoteDirectory` setting is the location of the screenshots.  The above
 path is a an example of where it will be on a 64-bit Windows installation,
 replacing `<user directory>` with the appropriate numbered directory.
 
-The `Address` setting is simply the address to listen on.  For example, if you
-only want to allow local connections on port 8080 set this to `127.0.0.1:8080`.
+`RefreshInterval` is the interval at which the `RemoteDirectory` will be scanned
+for changes, in minutes.  The lowest valid value is one minute.  Anything lower
+will be reset to one minute.
 
 ## Notes
 
@@ -53,6 +69,11 @@ only want to allow local connections on port 8080 set this to `127.0.0.1:8080`.
  6. Run `./steam-screenshots`
  7. Detach the tmux or screen session (`Ctrl-b, d` for tmux, `Ctrl-a d` for
  screen)
+
+## TODO
+
+* Daemon scripts (SysV, Systemd, Windows service)
+* Configuration examples for running behind Nginx/Apache
 
 ## License
 
