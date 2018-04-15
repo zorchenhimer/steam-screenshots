@@ -22,9 +22,8 @@ type Settings struct {
 		Appid string `json:"id"`
 		Name  string `json:"name"`
 	}
+	RefreshInterval int // In minutes
 }
-
-//var LastUpdate  *time.Time
 
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
 
@@ -122,7 +121,7 @@ func (s *Server) Run() {
 	// Fire and forget.  TODO: graceful shutdown
 	go func() {
 		for {
-			time.Sleep(time.Minute)
+			time.Sleep(time.Minute * time.Duration(s.settings.RefreshInterval))
 			if err := s.scan(false); err != nil {
 				fmt.Printf("Error scanning: %s", err)
 			}
@@ -222,6 +221,10 @@ func (s *Server) loadSettings() error {
 	}
 
 	fmt.Println("Settings loaded")
+
+	if s.settings.RefreshInterval < 1 {
+		s.settings.RefreshInterval = 1
+	}
 
 	//updateGamesJson("")
 	return s.loadGames()

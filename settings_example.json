@@ -1,5 +1,4 @@
 {
-    "RemoteDirectory": "C:/path/to/steam/remote/folder",
     "Address": ":8080",
     "AppidOverrides": [
         {
@@ -9,5 +8,7 @@
             "id": "33440",
             "name": "Driver San Francisco"
         }
-    ]
+    ],
+    "RemoteDirectory": "C:/path/to/steam/remote/folder",
+    "RefreshInterval": 10
 }
