@@ -56,6 +56,8 @@ type Server struct {
 
 	Games      *GameList
 	ImageCache *GameImages
+
+	SettingsFile string
 }
 
 func (s *Server) Run() {
@@ -206,8 +208,9 @@ func GetKeys(m map[string][]string) []string {
 // FIXME: pass the filename in here as an argument
 func (s *Server) loadSettings() error {
 	settingsFilename := "settings.json"
-	if len(os.Args) > 1 {
-		settingsFilename = os.Args[1]
+
+	if len(s.SettingsFile) > 0 {
+		settingsFilename = s.SettingsFile
 	}
 
 	settingsFile, err := ioutil.ReadFile(settingsFilename)
