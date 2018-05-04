@@ -145,11 +145,17 @@ func (s *Server) handler_main(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// FIXME: sanitize this shit!
 func (s *Server) handler_thumb(w http.ResponseWriter, r *http.Request) {
 	split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(split) != 3 {
-		fmt.Fprintf(w, "[split error] %s", split)
+		fmt.Printf(w, "[split error] %s\n", split)
+		http.NotFound(w, r)
+		return
+	}
+
+	if split[1] == ".." || split[1] == "." || split[2] == ".." || split[2] == "." {
+		fmt.Printf("Dots in handler_thumb() url: %q\n", r.URL.Path)
+		http.NotFound(w, r)
 		return
 	}
 
@@ -166,7 +172,14 @@ func (s *Server) handler_thumb(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handler_image(w http.ResponseWriter, r *http.Request) {
 	split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(split) != 3 {
-		fmt.Fprintf(w, "[split error] %s\n", split)
+		fmt.Printf("[split error] %s\n", split)
+		http.NotFound(w, r)
+		return
+	}
+
+	if split[1] == ".." || split[1] == "." || split[2] == ".." || split[2] == "." {
+		fmt.Printf("Dots in handler_image() url: %q\n", r.URL.Path)
+		http.NotFound(w, r)
 		return
 	}
 
@@ -183,9 +196,17 @@ func (s *Server) handler_banner(w http.ResponseWriter, r *http.Request) {
 	split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 
 	if len(split) != 2 {
-		fmt.Fprintf(w, "[split error] %s\n", split)
+		fmt.Printf(w, "[split error] %s\n", split)
+		http.NotFound(w, r)
 		return
 	}
+
+	// FIXME: does this need to be sanitized like handler_image()?
+	//if split[1] == ".." || split[1] == "." || split[2] == ".." || split[2] == "." {
+	//	fmt.Printf("Dots in handler_banner() url: %q\n", r.URL.Path)
+	//	http.NotFound(w, r)
+	//	return
+	//}
 
 	appidbase := split[1]
 	if idx := strings.LastIndex(appidbase, "."); idx > -1 {
