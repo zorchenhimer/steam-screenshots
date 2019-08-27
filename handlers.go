@@ -43,16 +43,7 @@ func (s *Server) handler_main(w http.ResponseWriter, r *http.Request) {
 	//    return
 	//}
 
-	//root, err := discover()
-	//if err != nil {
-	//    fmt.Fprintf(w, "Error discovering: %s", err)
-	//    return
-	//}
-
-	//keys := GetKeys(root)
-	s.dataLock.Lock()
-	keys := GetKeys(s.dataTree)
-	s.dataLock.Unlock()
+	keys := s.dataTree.GetKeys()
 
 	// Game page
 	if r.URL.Path != "/" {

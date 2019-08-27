@@ -3,15 +3,12 @@ package steamscreenshots
 import (
 	"encoding/json"
 	"fmt"
-	//"html"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
-	//"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -51,8 +48,7 @@ type Server struct {
 
 	settings Settings
 	// TODO: remove this.  Pretty sure this is duplicated info from ImageCache
-	dataTree map[string][]string
-	dataLock *sync.Mutex
+	dataTree *DataTree
 
 	Games      *GameList
 	ImageCache *GameImages
@@ -61,6 +57,8 @@ type Server struct {
 }
 
 func (s *Server) Run() {
+	fmt.Println("Starting server")
+
 	if len(gitCommit) == 0 {
 		gitCommit = "Missing commit hash"
 	}
@@ -70,8 +68,8 @@ func (s *Server) Run() {
 	}
 	fmt.Printf("%s@%s\n", version, gitCommit)
 
+	s.dataTree = NewDataTree()
 	s.startTime = time.Now()
-	s.dataLock = &sync.Mutex{}
 
 	s.Games = NewGameList()
 	if err := s.loadSettings(); err != nil {
@@ -175,9 +173,7 @@ func (s *Server) scan(printOutput bool) error {
 	}
 
 	// Update in-memory cache
-	s.dataLock.Lock()
-	s.dataTree = tmpTree
-	s.dataLock.Unlock()
+	s.dataTree.Update(tmpTree)
 
 	// Write cache to disk after it's updated in-memory so failing this doesn't skip updating.
 	if err := s.ImageCache.Save("image.cache"); err != nil {
@@ -194,15 +190,6 @@ func SliceContains(s []string, val string) bool {
 		}
 	}
 	return false
-}
-
-func GetKeys(m map[string][]string) []string {
-	keys := []string{}
-	for k, _ := range m {
-		keys = append(keys, k)
-	}
-
-	return keys
 }
 
 // FIXME: pass the filename in here as an argument
@@ -229,7 +216,6 @@ func (s *Server) loadSettings() error {
 		s.settings.RefreshInterval = 1
 	}
 
-	//updateGamesJson("")
 	return s.loadGames()
 }
 
