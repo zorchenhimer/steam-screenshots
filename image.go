@@ -10,7 +10,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
+	"time"
 )
 
 var (
@@ -20,8 +22,9 @@ var (
 )
 
 type GameImages struct {
-	Games map[string][]ImageMeta // appid key
-	lock  *sync.Mutex
+	Games   map[string][]ImageMeta // appid key
+	Updated time.Time
+	lock    *sync.RWMutex
 }
 
 type ImageMeta struct {
@@ -31,13 +34,13 @@ type ImageMeta struct {
 }
 
 func (i ImageMeta) String() string {
-	return fmt.Sprintf("%s; (%d, %d)", i.Name, i.Width, i.Height)
+	return fmt.Sprintf("[%s (%d, %d)]", i.Name, i.Width, i.Height)
 }
 
 func NewGameImages() *GameImages {
 	return &GameImages{
 		Games: make(map[string][]ImageMeta),
-		lock:  &sync.Mutex{},
+		lock:  &sync.RWMutex{},
 	}
 }
 
@@ -48,6 +51,10 @@ func LoadImageCache(filename string) (*GameImages, error) {
 		return nil, err
 	}
 
+	return ParseImageCache(raw)
+}
+
+func ParseImageCache(raw []byte) (*GameImages, error) {
 	i := NewGameImages()
 	if err := json.Unmarshal(raw, i); err != nil {
 		return nil, err
@@ -79,6 +86,65 @@ func (gi *GameImages) ScanNewPath(path string) error {
 	}
 
 	return nil
+}
+
+// ScanDirectory scans an entire directory tree, starting from the root.
+func FullScan(directory string, printOutput bool) (*GameImages, error) {
+	gi := NewGameImages()
+	gi.Updated = time.Now()
+
+	if printOutput {
+		fmt.Printf("Scanning %q\n", directory)
+	}
+
+	dir, err := filepath.Glob(filepath.Join(directory, "*"))
+	if err != nil {
+		return nil, fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
+	}
+	gi.Games = make(map[string][]ImageMeta)
+
+	for _, d := range dir {
+		base := filepath.Base(d)
+
+		// Ignore dotfiles
+		if strings.HasPrefix(base, ".") {
+			continue
+		}
+
+		if printOutput {
+			fmt.Printf("[%s] %s\n", base, "??") //s.Games.Get(base))
+		}
+
+		jpgdir, err := filepath.Glob(filepath.Join(d, "screenshots", "*.jpg"))
+		if err != nil {
+			fmt.Printf("JPG glob error in %q: %s", d, err)
+			continue
+		}
+
+		// iterate through directory.
+		metas := []ImageMeta{}
+		for _, img := range jpgdir {
+			fmt.Printf("  reading meta for %s\n", img)
+			m, err := readImage(img)
+			if err != nil {
+				fmt.Println(err)
+				continue
+			}
+			metas = append(metas, *m)
+		}
+		gi.Games[base] = metas
+
+		// TODO: merge ImageCache.ScanPath() and ImagePath.RefreshPath(), possibly removing the jpg glob above as well.
+		err = gi.ScanPath(d)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	// Update in-memory cache
+	//gi.Update(tmpTree)
+
+	return gi, nil
 }
 
 func (gi *GameImages) ScanPath(path string) error {
@@ -160,8 +226,7 @@ func readImage(fullpath string) (*ImageMeta, error) {
 
 func (gi *GameImages) Save(filename string) error {
 	gi.lock.Lock()
-	//raw, err := json.Marshal(gi)
-	raw, err := json.MarshalIndent(gi, "", "  ")
+	raw, err := json.Marshal(gi)
 	gi.lock.Unlock()
 	if err != nil {
 		return err
@@ -211,7 +276,7 @@ func (gi *GameImages) GetMetadata(appid string) []Metadata {
 		return nil
 	}
 
-	gi.lock.Lock()
+	gi.lock.RLock()
 	for _, meta := range theGame {
 		images = append(images, Metadata{
 			Src:    fmt.Sprintf("/img/%s/%s", appid, meta.Name),
@@ -219,7 +284,7 @@ func (gi *GameImages) GetMetadata(appid string) []Metadata {
 			Height: meta.Height,
 		})
 	}
-	gi.lock.Unlock()
+	gi.lock.RUnlock()
 
 	return images
 }

@@ -286,3 +286,21 @@ func (s *Server) handler_debug(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 }
+
+func (s *Server) handler_api_cache(w http.ResponseWriter, r *http.Request) {
+	if !s.checkApiKey(w, r) {
+		return
+	}
+
+	http.ServeFile(w, r, "image.cache")
+}
+
+// checkApiKey returns True if the key is valid
+func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
+	key := r.Header.Get("api-key")
+	if key != s.settings.ApiKey {
+		w.WriteHeader(http.StatusUnauthorized)
+		return false
+	}
+	return true
+}

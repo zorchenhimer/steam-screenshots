@@ -1,9 +1,11 @@
 package steamscreenshots
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -19,7 +21,8 @@ type Settings struct {
 		Appid string `json:"id"`
 		Name  string `json:"name"`
 	}
-	RefreshInterval int // In minutes
+	RefreshInterval int    // In minutes
+	ApiKey          string // This will be regenerated if it is empty.
 }
 
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
@@ -70,8 +73,8 @@ func (s *Server) Run() {
 
 	s.dataTree = NewDataTree()
 	s.startTime = time.Now()
-
 	s.Games = NewGameList()
+
 	if err := s.loadSettings(); err != nil {
 		fmt.Printf("Error loading settings: %s\n", err)
 		return
@@ -89,6 +92,7 @@ func (s *Server) Run() {
 	mux.HandleFunc("/banner/", s.handler_banner)
 	mux.HandleFunc("/static/", s.handler_static)
 	mux.HandleFunc("/debug/", s.handler_debug)
+	mux.HandleFunc("/api/get-cache", s.handler_api_cache)
 
 	server := &http.Server{
 		Addr:           s.settings.Address,
@@ -128,11 +132,30 @@ func (s *Server) Run() {
 		}
 	}()
 
+	// Generate a new API key if it's empty
+	if s.settings.ApiKey == "" {
+		out := ""
+		large := big.NewInt(int64(1 << 60))
+		large = large.Add(large, large)
+		for len(out) < 50 {
+			num, err := rand.Int(rand.Reader, large)
+			if err != nil {
+				panic("Error generating session key: " + err.Error())
+			}
+			out = fmt.Sprintf("%s%X", out, num)
+		}
+		s.settings.ApiKey = out
+		fmt.Println("New API key generated: " + s.settings.ApiKey)
+	} else {
+		fmt.Printf("using API key in config: %q\n", s.settings.ApiKey)
+	}
+
 	fmt.Println("Listening on address: " + s.settings.Address)
 	fmt.Println("Fisnished startup.")
 	server.ListenAndServe()
 }
 
+// TODO: use GameImages.FullScan for this?
 func (s *Server) scan(printOutput bool) error {
 	s.lastScan = time.Now()
 
