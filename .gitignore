@@ -2,8 +2,8 @@
 *.exe
 *.swp
 
-settings.json
-games.json
+*.json
+!settings_example.json
 
 PhotoSwipe-master/
 builds/
