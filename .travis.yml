@@ -3,6 +3,3 @@ language: go
 go:
     - tip
     - master
-
-script:
-    go test -v ./...
