@@ -1,6 +1,7 @@
 package steamscreenshots
 
 import (
+	"encoding/json"
 	"sync"
 )
 
@@ -17,6 +18,17 @@ func NewGameList() *GameList {
 	return &GameList{
 		games: make(map[string]string),
 	}
+}
+
+func ParseGames(raw []byte) (*GameList, error) {
+	games := make(map[string]string)
+
+	err := json.Unmarshal(raw, &games)
+	if err != nil {
+		return nil, err
+	}
+
+	return &GameList{games: games}, nil
 }
 
 func (g *GameList) Get(id string) string {

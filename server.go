@@ -50,8 +50,6 @@ type Server struct {
 	lastUpdate *time.Time
 
 	settings Settings
-	// TODO: remove this.  Pretty sure this is duplicated info from ImageCache
-	dataTree *DataTree
 
 	Games      *GameList
 	ImageCache *GameImages
@@ -71,7 +69,6 @@ func (s *Server) Run() {
 	}
 	fmt.Printf("%s@%s\n", version, gitCommit)
 
-	s.dataTree = NewDataTree()
 	s.startTime = time.Now()
 	s.Games = NewGameList()
 
@@ -93,6 +90,8 @@ func (s *Server) Run() {
 	mux.HandleFunc("/static/", s.handler_static)
 	mux.HandleFunc("/debug/", s.handler_debug)
 	mux.HandleFunc("/api/get-cache", s.handler_api_cache)
+	mux.HandleFunc("/api/get-games", s.handler_api_games)
+	mux.HandleFunc("/api/add-image", s.handler_api_addImage)
 
 	server := &http.Server{
 		Addr:           s.settings.Address,
@@ -123,14 +122,14 @@ func (s *Server) Run() {
 	fmt.Println("Initial scan OK")
 
 	// Fire and forget.  TODO: graceful shutdown
-	go func() {
-		for {
-			time.Sleep(time.Minute * time.Duration(s.settings.RefreshInterval))
-			if err := s.scan(false); err != nil {
-				fmt.Printf("Error scanning: %s", err)
-			}
-		}
-	}()
+	//go func() {
+	//	for {
+	//		time.Sleep(time.Minute * time.Duration(s.settings.RefreshInterval))
+	//		if err := s.scan(false); err != nil {
+	//			fmt.Printf("Error scanning: %s", err)
+	//		}
+	//	}
+	//}()
 
 	// Generate a new API key if it's empty
 	if s.settings.ApiKey == "" {
@@ -149,6 +148,13 @@ func (s *Server) Run() {
 	} else {
 		fmt.Printf("using API key in config: %q\n", s.settings.ApiKey)
 	}
+
+	go func(s *Server) {
+		for {
+			s.ImageCache.Save("image.cache")
+			time.Sleep(10 * time.Minute)
+		}
+	}(s)
 
 	fmt.Println("Listening on address: " + s.settings.Address)
 	fmt.Println("Fisnished startup.")
@@ -194,9 +200,6 @@ func (s *Server) scan(printOutput bool) error {
 			fmt.Println(err)
 		}
 	}
-
-	// Update in-memory cache
-	s.dataTree.Update(tmpTree)
 
 	// Write cache to disk after it's updated in-memory so failing this doesn't skip updating.
 	if err := s.ImageCache.Save("image.cache"); err != nil {
