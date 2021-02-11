@@ -341,7 +341,7 @@ func (s *Server) updateGamesJson() error {
 		return fmt.Errorf("Unable to marshal game json: %s", err)
 	}
 
-	err = ioutil.WriteFile("games.cache", marshaled, 0777)
+	err = ioutil.WriteFile("games.cache", marshaled, 0644)
 	if err != nil {
 		return fmt.Errorf("Unable to save games.cache: %s", err)
 	}

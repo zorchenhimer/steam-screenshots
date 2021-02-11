@@ -307,14 +307,14 @@ func (gi *GameImages) Save(filename string) error {
 	}
 
 	gi.lock.Lock()
-	raw, err := json.Marshal(gi)
+	raw, err := json.MarshalIndent(gi, "", "  ")
 	gi.lock.Unlock()
 
 	if err != nil {
 		return err
 	}
 
-	if err = ioutil.WriteFile(filename, raw, 664); err != nil {
+	if err = ioutil.WriteFile(filename, raw, 0644); err != nil {
 		return err
 	}
 
