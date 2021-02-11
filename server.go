@@ -1,6 +1,7 @@
 package steamscreenshots
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
@@ -8,9 +9,11 @@ import (
 	"math/big"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -161,7 +164,29 @@ func (s *Server) Run() {
 
 	fmt.Println("Listening on address: " + s.settings.Address)
 	fmt.Println("Fisnished startup.")
-	server.ListenAndServe()
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Println("Listen: ", err)
+		}
+	}()
+
+	fmt.Println("Started")
+
+	<-done
+	fmt.Println("Stopped")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		fmt.Println("Clean shutdown failed: ", err)
+	}
+
+	fmt.Println("goodbye")
 }
 
 // TODO: use GameImages.FullScan for this?
