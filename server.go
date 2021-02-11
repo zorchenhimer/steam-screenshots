@@ -72,7 +72,7 @@ func (s *Server) Run() {
 	s.startTime = time.Now()
 	s.Games = NewGameList()
 
-	if err := s.loadSettings(); err != nil {
+	if err := s.loadSettings("settings.json"); err != nil {
 		fmt.Printf("Error loading settings: %s\n", err)
 		return
 	}
@@ -145,6 +145,9 @@ func (s *Server) Run() {
 		}
 		s.settings.ApiKey = out
 		fmt.Println("New API key generated: " + s.settings.ApiKey)
+		if err = s.saveSettings("settings.json"); err != nil {
+			panic(fmt.Sprintf("unable to save settings: %v", err))
+		}
 	} else {
 		fmt.Printf("using API key in config: %q\n", s.settings.ApiKey)
 	}
@@ -218,15 +221,23 @@ func SliceContains(s []string, val string) bool {
 	return false
 }
 
-// FIXME: pass the filename in here as an argument
-func (s *Server) loadSettings() error {
-	settingsFilename := "settings.json"
-
-	if len(s.SettingsFile) > 0 {
-		settingsFilename = s.SettingsFile
+func (s *Server) saveSettings(filename string) error {
+	raw, err := json.MarshalIndent(s.settings, "", "    ")
+	if err != nil {
+		return err
 	}
 
-	settingsFile, err := ioutil.ReadFile(settingsFilename)
+	err = ioutil.WriteFile(filename, raw, 0600)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(filename, 0600)
+}
+
+// FIXME: pass the filename in here as an argument
+func (s *Server) loadSettings(filename string) error {
+	settingsFile, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("Error reading settings file: %s", err)
 	}
