@@ -122,14 +122,14 @@ func (s *Server) Run() {
 	fmt.Println("Initial scan OK")
 
 	// Fire and forget.  TODO: graceful shutdown
-	//go func() {
-	//	for {
-	//		time.Sleep(time.Minute * time.Duration(s.settings.RefreshInterval))
-	//		if err := s.scan(false); err != nil {
-	//			fmt.Printf("Error scanning: %s", err)
-	//		}
-	//	}
-	//}()
+	go func() {
+		for {
+			time.Sleep(time.Minute * time.Duration(s.settings.RefreshInterval))
+			if err := s.scan(false); err != nil {
+				fmt.Printf("Error scanning: %s", err)
+			}
+		}
+	}()
 
 	// Generate a new API key if it's empty
 	if s.settings.ApiKey == "" {
