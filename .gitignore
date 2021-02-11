@@ -9,6 +9,11 @@ PhotoSwipe-master/
 builds/
 data/
 tmp/
+bin/
+
+# testing folders
+local-remote/
+server-remote/
 
 # Linux binary
 steam-screenshots
