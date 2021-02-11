@@ -186,6 +186,11 @@ func (s *Server) scan(printOutput bool) error {
 			continue
 		}
 
+		if !isDir(d) {
+			fmt.Printf("%q is not a directory\n", d)
+			continue
+		}
+
 		if printOutput {
 			fmt.Printf("[%s] %s\n", base, s.Games.Get(base))
 		}
@@ -413,4 +418,13 @@ func exists(path string) bool {
 		return false
 	}
 	return true
+}
+
+func isDir(path string) bool {
+	fi, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+
+	return fi.IsDir()
 }
