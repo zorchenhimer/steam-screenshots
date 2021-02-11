@@ -129,7 +129,8 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	found := false
-	host := r.Host
+	host := r.RemoteAddr
+
 	if strings.Contains(host, ":") {
 		host = host[:strings.Index(host, ":")]
 	}
@@ -141,7 +142,7 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	if !found {
-		fmt.Printf("IP %s not in API whitelist", r.Host)
+		fmt.Printf("IP %s not in API whitelist\n", r.Host)
 		return false
 	}
 
