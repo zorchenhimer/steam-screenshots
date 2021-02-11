@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
+	"strings"
 )
 
 func (s *Server) handler_api_cache(w http.ResponseWriter, r *http.Request) {
@@ -122,12 +123,35 @@ func (s *Server) removeImages(w http.ResponseWriter, r *http.Request) {
 
 // checkApiKey returns True if the key is valid
 func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
+	if s.settings.ApiWhitelist == nil || len(s.settings.ApiWhitelist) == 0 {
+		fmt.Println("No IP addresses in API Whitelist")
+		return false
+	}
+
+	found := false
+	host := r.Host
+	if strings.Contains(host, ":") {
+		host = host[:strings.Index(host, ":")]
+	}
+
+	for _, ip := range s.settings.ApiWhitelist {
+		if host == ip {
+			found = true
+		}
+	}
+
+	if !found {
+		fmt.Printf("IP %s not in API whitelist", r.Host)
+		return false
+	}
+
 	key := r.Header.Get("api-key")
 	if key != s.settings.ApiKey {
 		fmt.Printf("invalid or missing api key: %q\n", key)
 		w.WriteHeader(http.StatusUnauthorized)
 		return false
 	}
+
 	return true
 }
 

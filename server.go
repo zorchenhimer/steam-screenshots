@@ -37,6 +37,7 @@ type Settings struct {
 	}
 	RefreshInterval int    // In minutes
 	ApiKey          string // This will be regenerated if it is empty.
+	ApiWhitelist    []string
 }
 
 var re_gamename = regexp.MustCompile(`<td itemprop="name">(.+?)</td>`)
