@@ -12,12 +12,14 @@ package main
 */
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	ss "github.com/zorchenhimer/steam-screenshots"
 )
@@ -72,8 +74,9 @@ func main() {
 	removed := map[string][]string{}
 	added := map[string][]ss.ImageMeta{}
 	for key, val := range localCache.Games {
-		//fmt.Printf("[%s] %s\n", key, val)
+		fmt.Printf("[%s]\n", key)
 		for _, img := range val {
+			fmt.Printf("  %s\n", img.Name)
 			if !serverCache.Contains(key, img.Name) {
 				added[key] = val
 			}
@@ -177,16 +180,18 @@ func apiRequest(endpoint string) ([]byte, error) {
 
 // TODO: thumbnail
 func uploadImage(game string, meta ss.ImageMeta) error {
-	reqUrl := fmt.Sprintf("%s/api/add-image", config.Server)
-
+	reqUrl := fmt.Sprintf("%s/api/add-image", strings.TrimRight(config.Server, "/"))
 	fname := filepath.Join(config.RemoteDirectory, game, "screenshots", meta.Name)
-	//fmt.Printf("filename to upload: %s\n", fname)
-	imgFile, err := os.Open(fname)
+
+	rawimg, err := ioutil.ReadFile(fname)
 	if err != nil {
-		return fmt.Errorf("Unable to open %q for uploading: %s", fname, err)
+		return fmt.Errorf("Unable to read image %q: %s", fname, err)
 	}
 
-	req, err := http.NewRequest("POST", reqUrl, imgFile)
+	buf := bytes.NewBuffer(rawimg)
+	fmt.Printf("image size: %d\n", buf.Len())
+
+	req, err := http.NewRequest("POST", reqUrl, buf)
 	if err != nil {
 		return fmt.Errorf("Unable to create request: %s", err)
 	}
@@ -195,24 +200,26 @@ func uploadImage(game string, meta ss.ImageMeta) error {
 	req.Header.Add("filename", meta.Name)
 	req.Header.Add("game-id", game)
 
+	fmt.Println("method:", req.Method)
 	client := http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("Error sending request: %s\n", err)
 	}
+	defer resp.Body.Close()
 
-	//fmt.Println(resp.Status)
+	fmt.Println(resp.Status)
 	if resp.StatusCode != 200 {
-		fmt.Printf("Non 200 status code returned: %d\n", resp.Status)
+		fmt.Printf("Non 200 status code returned: %s\n", resp.Status)
 	}
 
-	//if resp.Body != nil {
-	//	raw, err := ioutil.ReadAll(resp.Body)
-	//	if err != nil {
-	//		return fmt.Errorf("Unable to read body: %s", err)
-	//	}
-	//	fmt.Println(raw)
-	//}
+	if resp.Body != nil {
+		raw, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("Unable to read body: %s", err)
+		}
+		fmt.Printf("Body: %s\n", raw)
+	}
 
 	return nil
 }

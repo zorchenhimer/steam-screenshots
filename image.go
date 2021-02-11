@@ -29,6 +29,8 @@ type GameImages struct {
 	Games   map[string][]ImageMeta // appid key
 	Updated time.Time
 	lock    *sync.RWMutex
+
+	isDirty bool
 }
 
 func (gi GameImages) String() string {
@@ -82,6 +84,8 @@ func ParseImageCache(raw []byte) (*GameImages, error) {
 func (gi *GameImages) addImageMeta(game string, meta ImageMeta) {
 	gi.lock.Lock()
 	defer gi.lock.Unlock()
+
+	gi.isDirty = true
 
 	if _, ok := gi.Games[game]; !ok {
 		gi.Games[game] = []ImageMeta{}
@@ -143,8 +147,8 @@ func FullScan(directory string) (*GameImages, error) {
 				//fmt.Println(filename)
 				meta, err := readImage(filename)
 				if err != nil {
-					//fmt.Println(err)
-					panic(err)
+					fmt.Println(err)
+					//panic(err)
 					continue
 				}
 				gameId := gameIdFromPath(filename)
@@ -294,6 +298,13 @@ func readRawImage(raw []byte) (*ImageMeta, error) {
 }
 
 func (gi *GameImages) Save(filename string) error {
+	gi.lock.Lock()
+	defer gi.lock.Unlock()
+
+	if !gi.isDirty {
+		return nil
+	}
+
 	if exists(filename) {
 		fi, err := os.Stat(filename)
 		if err != nil {
@@ -306,10 +317,7 @@ func (gi *GameImages) Save(filename string) error {
 		}
 	}
 
-	gi.lock.Lock()
 	raw, err := json.MarshalIndent(gi, "", "  ")
-	gi.lock.Unlock()
-
 	if err != nil {
 		return err
 	}
@@ -318,6 +326,7 @@ func (gi *GameImages) Save(filename string) error {
 		return err
 	}
 
+	gi.isDirty = false
 	return nil
 }
 

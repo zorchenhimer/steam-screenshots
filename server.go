@@ -1,5 +1,16 @@
 package steamscreenshots
 
+/*
+
+	Broken:
+		non-directories in root being added as games
+
+	TODO:
+		fsnotify
+		clean up directory scan code (why is it duplicated?)
+		add ability to turn off directory scanning on server
+*/
+
 import (
 	"context"
 	"crypto/rand"
@@ -155,12 +166,12 @@ func (s *Server) Run() {
 		fmt.Printf("using API key in config: %q\n", s.settings.ApiKey)
 	}
 
-	go func(s *Server) {
-		for {
-			s.ImageCache.Save("image.cache")
-			time.Sleep(10 * time.Minute)
-		}
-	}(s)
+	//go func(s *Server) {
+	//	for {
+	//		s.ImageCache.Save("image.cache")
+	//		time.Sleep(10 * time.Minute)
+	//	}
+	//}(s)
 
 	fmt.Println("Listening on address: " + s.settings.Address)
 	fmt.Println("Fisnished startup.")
