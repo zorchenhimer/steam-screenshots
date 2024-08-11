@@ -6,7 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
-	"strings"
+	//"strings"
+	"net"
 )
 
 func (s *Server) handler_api_cache(w http.ResponseWriter, r *http.Request) {
@@ -112,7 +113,8 @@ func (s *Server) handler_api_addImage(w http.ResponseWriter, r *http.Request) {
 
 	// Add image to cache
 	s.ImageCache.addImageMeta(gameId, *meta)
-	s.ImageCache.Save("image.cache")
+	//s.ImageCache.Save("image.cache")
+	s.ImageCache.Dirty()
 }
 
 func (s *Server) removeImages(w http.ResponseWriter, r *http.Request) {
@@ -129,10 +131,10 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	found := false
-	host := r.RemoteAddr
-
-	if strings.Contains(host, ":") {
-		host = host[:strings.Index(host, ":")]
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		fmt.Printf("Error splitting host and port for %q: %s\n", r.RemoteAddr, err)
+		return false
 	}
 
 	for _, ip := range s.settings.ApiWhitelist {
@@ -142,7 +144,7 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	if !found {
-		fmt.Printf("IP %s not in API whitelist\n", r.Host)
+		fmt.Printf("IP %q not in API whitelist\n", host)
 		return false
 	}
 

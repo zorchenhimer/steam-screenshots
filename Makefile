@@ -1,15 +1,15 @@
 .PHONY: run all clean fmt
 
-all: fmt bin/server.exe bin/uploader.exe
+all: fmt bin/server bin/uploader
 
 clean:
-	rm bin/*.*
+	-rm -r bin/
 
-run: bin/server.exe
-	bin/server.exe
+run: bin/server
+	bin/server
 
 fmt:
 	go fmt ./...
 
-bin/%.exe: cmd/%.go *.go
+bin/%: cmd/%.go *.go
 	go build -o $@ $<

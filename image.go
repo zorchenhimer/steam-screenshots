@@ -112,6 +112,7 @@ func (gi *GameImages) ScanNewPath(path string) error {
 
 		gi.lock.Lock()
 		gi.Games[appid] = append(gi.Games[appid], *meta)
+		gi.isDirty = true
 		gi.lock.Unlock()
 	}
 
@@ -191,6 +192,54 @@ func FullScan(directory string) (*GameImages, error) {
 	return gi, nil
 }
 
+// takes the base remote folder as the path
+func (gi *GameImages) RemoveMissing(path string) {
+
+	gi.lock.RLock()
+	defer gi.lock.RUnlock()
+
+	// Range over current cache, remove missing items
+	for appid, items := range gi.Games {
+		// look for appid folder
+		_ = items
+		apppath := filepath.Join(path, appid)
+		_, err := os.Stat(apppath)
+		if err != nil {
+			gi.lock.RUnlock()
+			gi.lock.Lock()
+
+			fmt.Printf("Game with appID %s no longer exists!\n", appid)
+			delete(gi.Games, appid)
+
+			gi.isDirty = true
+
+			gi.lock.Unlock()
+			gi.lock.RLock()
+			continue
+		}
+
+		ssdir, err := filepath.Glob(filepath.Join(path, appid, "screenshots", "*.jpg"))
+		if err != nil {
+			fmt.Printf("Unable to glob screenshot directory for appid %s: %s", appid, err)
+			continue
+		}
+
+		_ = ssdir
+		//fmt.Println("globbed images:")
+		//for _, i := range ssdir {
+		//	fmt.Println(i)
+		//}
+
+		//for _, image := range items {
+		//	for _, i := range ssdir {
+		//		fmt.Println(i)
+		//	}
+		//}
+	}
+
+	fmt.Println("Finished RemoveMissing()")
+}
+
 func (gi *GameImages) ScanPath(path string) error {
 	appid := filepath.Base(path)
 
@@ -209,13 +258,14 @@ func (gi *GameImages) ScanPath(path string) error {
 	}
 
 	for _, f := range dir {
-
-		// Remove image if it no longer exists.  Improper read permissions is treated as "not existing" here.
-		_, err := os.Stat(f)
-		if err != nil {
-			delete(gi.Games, appid)
-			continue
-		}
+		//// Remove image if it no longer exists.  Improper read permissions is
+		//// treated as "not existing" here.
+		//_, err := os.Stat(f)
+		//if err != nil {
+		//	fmt.Printf("%q no longer exists", f)
+		//	delete(gi.Games, appid)
+		//	continue
+		//}
 
 		// foreach image in directory
 		found := false
@@ -236,6 +286,7 @@ func (gi *GameImages) ScanPath(path string) error {
 			} else {
 				gi.lock.Lock()
 				gi.Games[appid] = append(gi.Games[appid], *newImage)
+				gi.isDirty = true
 				gi.lock.Unlock()
 			}
 		}
@@ -273,12 +324,6 @@ func readImage(fullpath string) (*ImageMeta, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Unable to decode %q: %s", fullpath, err)
 	}
-	//pt := img.Bounds().Max
-
-	_, err = os.Stat(fullpath)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to stat %q: %s", fullpath, err)
-	}
 
 	return &ImageMeta{
 		Name:   filepath.Base(fullpath),
@@ -300,23 +345,26 @@ func readRawImage(raw []byte) (*ImageMeta, error) {
 func (gi *GameImages) Save(filename string) error {
 	gi.lock.Lock()
 	defer gi.lock.Unlock()
+	fmt.Println("Saving image cache")
 
 	if !gi.isDirty {
 		return nil
 	}
 
-	if exists(filename) {
-		fi, err := os.Stat(filename)
-		if err != nil {
-			return fmt.Errorf("Error Stat()'ing %q: %s", filename, err)
-		}
+	//if exists(filename) {
+	//	_, err := os.Stat(filename)
+	//	if err != nil {
+	//		return fmt.Errorf("Error Stat()'ing %q: %s", filename, err)
+	//	}
 
-		// only update if the cache is old
-		if fi.ModTime().After(gi.Updated) {
-			return nil
-		}
-	}
+	//	// only update if the cache is old
+	//	//if fi.ModTime().After(gi.Updated) {
+	//	//	return nil
+	//	//}
+	//}
 
+	gi.Updated = time.Now()
+	//fmt.Println("gi.Games: ", gi.Games)
 	raw, err := json.MarshalIndent(gi, "", "  ")
 	if err != nil {
 		return err
@@ -328,6 +376,10 @@ func (gi *GameImages) Save(filename string) error {
 
 	gi.isDirty = false
 	return nil
+}
+
+func (gi *GameImages) Dirty() {
+	gi.isDirty = true
 }
 
 func (gi *GameImages) Dump() {

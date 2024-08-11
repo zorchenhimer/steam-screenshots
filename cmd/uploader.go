@@ -12,7 +12,7 @@ package main
 */
 
 import (
-	"bytes"
+	//"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -183,15 +183,20 @@ func uploadImage(game string, meta ss.ImageMeta) error {
 	reqUrl := fmt.Sprintf("%s/api/add-image", strings.TrimRight(config.Server, "/"))
 	fname := filepath.Join(config.RemoteDirectory, game, "screenshots", meta.Name)
 
-	rawimg, err := ioutil.ReadFile(fname)
+	//rawimg, err := ioutil.ReadFile(fname)
+	//if err != nil {
+	//	return fmt.Errorf("Unable to read image %q: %s", fname, err)
+	//}
+
+	//buf := bytes.NewBuffer(rawimg)
+	//fmt.Printf("image size: %d\n", buf.Len())
+	imgfile, err := os.Open(fname)
 	if err != nil {
-		return fmt.Errorf("Unable to read image %q: %s", fname, err)
+		return fmt.Errorf("Unable to open image image %q: %s", fname, err)
 	}
+	defer imgfile.Close()
 
-	buf := bytes.NewBuffer(rawimg)
-	fmt.Printf("image size: %d\n", buf.Len())
-
-	req, err := http.NewRequest("POST", reqUrl, buf)
+	req, err := http.NewRequest("POST", reqUrl, imgfile)
 	if err != nil {
 		return fmt.Errorf("Unable to create request: %s", err)
 	}
@@ -200,7 +205,7 @@ func uploadImage(game string, meta ss.ImageMeta) error {
 	req.Header.Add("filename", meta.Name)
 	req.Header.Add("game-id", game)
 
-	fmt.Println("method:", req.Method)
+	//fmt.Println("method:", req.Method)
 	client := http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -208,18 +213,18 @@ func uploadImage(game string, meta ss.ImageMeta) error {
 	}
 	defer resp.Body.Close()
 
-	fmt.Println(resp.Status)
+	//fmt.Println(resp.Status)
 	if resp.StatusCode != 200 {
 		fmt.Printf("Non 200 status code returned: %s\n", resp.Status)
 	}
 
-	if resp.Body != nil {
-		raw, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("Unable to read body: %s", err)
-		}
-		fmt.Printf("Body: %s\n", raw)
-	}
+	//if resp.Body != nil {
+	//	raw, err := ioutil.ReadAll(resp.Body)
+	//	if err != nil {
+	//		return fmt.Errorf("Unable to read body: %s", err)
+	//	}
+	//	//fmt.Printf("Body: %s\n", raw)
+	//}
 
 	return nil
 }

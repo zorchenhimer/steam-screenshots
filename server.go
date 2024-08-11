@@ -92,6 +92,11 @@ func (s *Server) Run() {
 		return
 	}
 
+	fmt.Println("Whitelisted API addresses:")
+	for _, val := range s.settings.ApiWhitelist {
+		fmt.Println("   ", val)
+	}
+
 	if err := init_templates(); err != nil {
 		fmt.Printf("Error loading templates: %s\n", err)
 		return
@@ -140,6 +145,7 @@ func (s *Server) Run() {
 	go func() {
 		for {
 			time.Sleep(time.Minute * time.Duration(s.settings.RefreshInterval))
+			fmt.Println("Periodic scan")
 			if err := s.scan(false); err != nil {
 				fmt.Printf("Error scanning: %s", err)
 			}
@@ -215,6 +221,8 @@ func (s *Server) scan(printOutput bool) error {
 	}
 	tmpTree := make(map[string][]string)
 
+	s.ImageCache.RemoveMissing(s.settings.RemoteDirectory)
+
 	for _, d := range dir {
 		base := filepath.Base(d)
 
@@ -223,33 +231,39 @@ func (s *Server) scan(printOutput bool) error {
 			continue
 		}
 
-		if !isDir(d) {
-			fmt.Printf("%q is not a directory\n", d)
-			continue
-		}
+		//if !isDir(d) {
+		//	fmt.Printf("%q is not a directory\n", d)
+		//	continue
+		//}
 
-		if printOutput {
-			fmt.Printf("[%s] %s\n", base, s.Games.Get(base))
-		}
+		//if printOutput {
+		//	fmt.Printf("[%s] %s\n", base, s.Games.Get(base))
+		//}
 
-		jpg, err := filepath.Glob(filepath.Join(d, "screenshots", "*.jpg"))
-		if err != nil {
-			fmt.Printf("JPG glob error in %q: %s", d, err)
-			continue
-		}
-		tmpTree[base] = jpg
+		//jpg, err := filepath.Glob(filepath.Join(d, "screenshots", "*.jpg"))
+		//if err != nil {
+		//	fmt.Printf("JPG glob error in %q: %s", d, err)
+		//	continue
+		//}
+		//tmpTree[base] = jpg
 
-		// TODO: merge ImageCache.ScanPath() and ImagePath.RefreshPath(), possibly removing the jpg glob above as well.
+		// TODO: merge ImageCache.ScanPath() and ImagePath.RefreshPath(),
+		// possibly removing the jpg glob above as well.
 		err = s.ImageCache.ScanPath(d)
 		if err != nil {
 			fmt.Println(err)
 		}
 	}
 
-	// Write cache to disk after it's updated in-memory so failing this doesn't skip updating.
+	fmt.Println("tmpTree", tmpTree)
+
+	// Write cache to disk after it's updated in-memory so failing this
+	// doesn't skip updating.
 	if err := s.ImageCache.Save("image.cache"); err != nil {
 		return fmt.Errorf("Unable to save image cache: %s\n", err)
 	}
+
+	fmt.Println("Scan done")
 
 	return nil
 }
