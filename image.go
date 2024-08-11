@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"image/jpeg"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -64,7 +63,7 @@ func NewGameImages() *GameImages {
 
 // Load cached image metadata from the given filename.
 func LoadImageCache(filename string) (*GameImages, error) {
-	raw, err := ioutil.ReadFile(filename)
+	raw, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -370,7 +369,7 @@ func (gi *GameImages) Save(filename string) error {
 		return err
 	}
 
-	if err = ioutil.WriteFile(filename, raw, 0644); err != nil {
+	if err = os.WriteFile(filename, raw, 0644); err != nil {
 		return err
 	}
 
@@ -464,7 +463,7 @@ func saveImage(fullpath string, raw []byte) error {
 		return fmt.Errorf("Error creating directory for image thumbnail: %s", err)
 	}
 
-	err = ioutil.WriteFile(fullpath, raw, 0777)
+	err = os.WriteFile(fullpath, raw, 0777)
 	if err != nil {
 		return fmt.Errorf("Unable to write full image: %s", err)
 	}

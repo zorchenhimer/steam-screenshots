@@ -3,7 +3,7 @@ package steamscreenshots
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path/filepath"
 	//"strings"
@@ -80,7 +80,7 @@ func (s *Server) handler_api_addImage(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	rawImage, err := ioutil.ReadAll(r.Body)
+	rawImage, err := io.ReadAll(r.Body)
 	if err != nil {
 		fmt.Printf("Error reading data: %s\n", err)
 		sendApiError(w, ApiError{

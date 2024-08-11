@@ -16,7 +16,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/big"
 	"net/http"
 	"os"
@@ -283,7 +283,7 @@ func (s *Server) saveSettings(filename string) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(filename, raw, 0600)
+	err = os.WriteFile(filename, raw, 0600)
 	if err != nil {
 		return err
 	}
@@ -293,7 +293,7 @@ func (s *Server) saveSettings(filename string) error {
 
 // FIXME: pass the filename in here as an argument
 func (s *Server) loadSettings(filename string) error {
-	settingsFile, err := ioutil.ReadFile(filename)
+	settingsFile, err := os.ReadFile(filename)
 	if err != nil {
 		return fmt.Errorf("Error reading settings file: %s", err)
 	}
@@ -320,7 +320,7 @@ func (s *Server) loadGames() error {
 		}
 	}
 
-	gamesFile, err := ioutil.ReadFile("games.cache")
+	gamesFile, err := os.ReadFile("games.cache")
 	if err != nil {
 		return fmt.Errorf("Error reading games file: %s", err)
 	}
@@ -380,7 +380,7 @@ func (s *Server) updateGamesJson() error {
 	}
 	defer resp.Body.Close()
 
-	js, err := ioutil.ReadAll(resp.Body)
+	js, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("Unable to read appid json: %s", err)
 	}
@@ -408,7 +408,7 @@ func (s *Server) updateGamesJson() error {
 		return fmt.Errorf("Unable to marshal game json: %s", err)
 	}
 
-	err = ioutil.WriteFile("games.cache", marshaled, 0644)
+	err = os.WriteFile("games.cache", marshaled, 0644)
 	if err != nil {
 		return fmt.Errorf("Unable to save games.cache: %s", err)
 	}
@@ -432,12 +432,12 @@ func (s *Server) getGameBanner(appid uint64) (string, error) {
 	if resp.StatusCode >= 400 && resp.StatusCode < 500 {
 		// Game not found.  Use unknown.
 
-		raw, err := ioutil.ReadFile("banners/unknown.jpg")
+		raw, err := os.ReadFile("banners/unknown.jpg")
 		if err != nil {
 			return "", fmt.Errorf("Unable to read unknown.jpg")
 		}
 
-		if err = ioutil.WriteFile("banners/"+appstr+".jpg", raw, 0777); err != nil {
+		if err = os.WriteFile("banners/"+appstr+".jpg", raw, 0777); err != nil {
 			return "", fmt.Errorf("Unable to save file: %s", err)
 		}
 
@@ -446,12 +446,12 @@ func (s *Server) getGameBanner(appid uint64) (string, error) {
 
 	defer resp.Body.Close()
 
-	file, err := ioutil.ReadAll(resp.Body)
+	file, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("Unable to read file: %s", err)
 	}
 
-	if err = ioutil.WriteFile("banners/"+appstr+".jpg", file, 0777); err != nil {
+	if err = os.WriteFile("banners/"+appstr+".jpg", file, 0777); err != nil {
 		return "", fmt.Errorf("Unable to save file: %s", err)
 	}
 
