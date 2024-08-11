@@ -209,6 +209,7 @@ func (gi *GameImages) Scan() error {
 	defer cachefile.Close()
 
 	enc := json.NewEncoder(cachefile)
+	enc.SetIndent("", "\t")
 	return enc.Encode(gi)
 }
 

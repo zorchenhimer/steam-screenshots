@@ -106,10 +106,11 @@ func (s *Server) Run() error {
 	fmt.Println("Starting server")
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", s.handler_main)
-	mux.HandleFunc("/thumb/", s.handler_thumb)
-	mux.HandleFunc("/img/", s.handler_image)
-	mux.HandleFunc("/banner/", s.handler_banner)
+	mux.HandleFunc("/{$}", s.handler_main)
+	mux.HandleFunc("/game/{appid}/{$}", s.handler_game)
+	mux.HandleFunc("/thumb/{appid}/{filename}", s.handler_thumb)
+	mux.HandleFunc("/img/{appid}/{filename}", s.handler_image)
+	//mux.HandleFunc("/banner/{appid}", s.handler_banner)
 	mux.HandleFunc("/static/", s.handler_static)
 	mux.HandleFunc("/debug/", s.handler_debug)
 	//mux.HandleFunc("/api/get-cache", s.handler_api_cache)
@@ -358,7 +359,6 @@ func (s *Server) updateGamesJson() error {
 	for _, a := range alist.Applist.Apps {
 		id := fmt.Sprintf("%d", a.Appid)
 		s.Games.Set(id, a.Name)
-
 	}
 
 	for _, ovr := range s.settings.AppidOverrides {
@@ -368,7 +368,7 @@ func (s *Server) updateGamesJson() error {
 
 	// save games.cache
 	games := s.Games.GetMap()
-	marshaled, err := json.Marshal(games)
+	marshaled, err := json.MarshalIndent(games, "", "\t")
 	if err != nil {
 		return fmt.Errorf("Unable to marshal game json: %s", err)
 	}
@@ -383,13 +383,13 @@ func (s *Server) updateGamesJson() error {
 }
 
 // Returns a filename
-func (s *Server) getGameBanner(appid uint64) (string, error) {
-	appstr := fmt.Sprintf("%d", appid)
-	if exist := exists("banners/" + appstr + ".jpg"); exist {
-		return "banners/" + appstr + ".jpg", nil
+func (s *Server) getGameBanner(appid string) (string, error) {
+	//appstr := fmt.Sprintf("%d", appid)
+	if exist := exists("banners/" + appid + ".jpg"); exist {
+		return "banners/" + appid + ".jpg", nil
 	}
 
-	resp, err := http.Get("http://cdn.akamai.steamstatic.com/steam/apps/" + appstr + "/header.jpg")
+	resp, err := http.Get("http://cdn.akamai.steamstatic.com/steam/apps/" + appid + "/header.jpg")
 	if err != nil {
 		return "", fmt.Errorf("Unable to DL header: %s", err)
 	}
@@ -402,11 +402,11 @@ func (s *Server) getGameBanner(appid uint64) (string, error) {
 			return "", fmt.Errorf("Unable to read unknown.jpg")
 		}
 
-		if err = os.WriteFile("banners/"+appstr+".jpg", raw, 0777); err != nil {
+		if err = os.WriteFile("banners/"+appid+".jpg", raw, 0777); err != nil {
 			return "", fmt.Errorf("Unable to save file: %s", err)
 		}
 
-		return "banners/" + appstr + ".jpg", nil
+		return "banners/" + appid + ".jpg", nil
 	}
 
 	defer resp.Body.Close()
@@ -416,11 +416,11 @@ func (s *Server) getGameBanner(appid uint64) (string, error) {
 		return "", fmt.Errorf("Unable to read file: %s", err)
 	}
 
-	if err = os.WriteFile("banners/"+appstr+".jpg", file, 0777); err != nil {
+	if err = os.WriteFile("banners/"+appid+".jpg", file, 0777); err != nil {
 		return "", fmt.Errorf("Unable to save file: %s", err)
 	}
 
-	return "banners/" + appstr + ".jpg", nil
+	return "banners/" + appid + ".jpg", nil
 }
 
 // exists returns whether the given file or directory exists or not.
