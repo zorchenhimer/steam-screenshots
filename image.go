@@ -452,7 +452,6 @@ func gameIdFromPath(path string) string {
 func saveImage(fullpath string, raw []byte) error {
 	dir := filepath.Dir(fullpath)
 
-	// TODO: config the file perms?
 	err := os.MkdirAll(dir, 0777)
 	if err != nil {
 		return fmt.Errorf("Error creating directory for image: %s", err)
@@ -463,7 +462,7 @@ func saveImage(fullpath string, raw []byte) error {
 		return fmt.Errorf("Error creating directory for image thumbnail: %s", err)
 	}
 
-	err = os.WriteFile(fullpath, raw, 0777)
+	err = os.WriteFile(fullpath, raw, 0666)
 	if err != nil {
 		return fmt.Errorf("Unable to write full image: %s", err)
 	}

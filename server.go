@@ -6,7 +6,6 @@ package steamscreenshots
 		non-directories in root being added as games
 
 	TODO:
-		fsnotify
 		clean up directory scan code (why is it duplicated?)
 		add ability to turn off directory scanning on server
 */
@@ -72,8 +71,23 @@ type Server struct {
 	SettingsFile string
 }
 
-func (s *Server) Run() {
-	fmt.Println("Starting server")
+func NewServer(settingsFile string) (*Server, error) {
+	s := &Server{
+		SettingsFile: settingsFile,
+	}
+
+	if err := s.loadSettings(settingsFile); err != nil {
+		return nil, fmt.Errorf("Error loading settings: %w", err)
+	}
+
+	fmt.Println("Whitelisted API addresses:")
+	for _, val := range s.settings.ApiWhitelist {
+		fmt.Println("   ", val)
+	}
+
+	if err := init_templates(); err != nil {
+		return nil, fmt.Errorf("Error loading templates: %w", err)
+	}
 
 	if len(gitCommit) == 0 {
 		gitCommit = "Missing commit hash"
@@ -87,20 +101,11 @@ func (s *Server) Run() {
 	s.startTime = time.Now()
 	s.Games = NewGameList()
 
-	if err := s.loadSettings("settings.json"); err != nil {
-		fmt.Printf("Error loading settings: %s\n", err)
-		return
-	}
+	return s, nil
+}
 
-	fmt.Println("Whitelisted API addresses:")
-	for _, val := range s.settings.ApiWhitelist {
-		fmt.Println("   ", val)
-	}
-
-	if err := init_templates(); err != nil {
-		fmt.Printf("Error loading templates: %s\n", err)
-		return
-	}
+func (s *Server) Run() error {
+	fmt.Println("Starting server")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", s.handler_main)
@@ -129,19 +134,17 @@ func (s *Server) Run() {
 		s.ImageCache = NewGameImages()
 		err = s.scan(true)
 		if err != nil {
-			fmt.Println("Initial scan error: ", err)
-			return
+			return fmt.Errorf("Initial scan error: %w", err)
 		}
 	} else {
 		fmt.Println("Refreshing RemoteDirectory...")
 		if err = s.scan(true); err != nil {
-			fmt.Println("Error refreshing RemoteDirectory: ", err)
-			return
+			return fmt.Errorf("Error refreshing RemoteDirectory: %w", err)
 		}
 	}
 	fmt.Println("Initial scan OK")
 
-	// Fire and forget.  TODO: graceful shutdown
+	// Fire and forget.  TODO: graceful shutdown; fix when scanning is rewritten
 	go func() {
 		for {
 			time.Sleep(time.Minute * time.Duration(s.settings.RefreshInterval))
@@ -205,6 +208,7 @@ func (s *Server) Run() {
 	}
 
 	fmt.Println("goodbye")
+	return nil
 }
 
 // TODO: use GameImages.FullScan for this?
@@ -291,7 +295,6 @@ func (s *Server) saveSettings(filename string) error {
 	return os.Chmod(filename, 0600)
 }
 
-// FIXME: pass the filename in here as an argument
 func (s *Server) loadSettings(filename string) error {
 	settingsFile, err := os.ReadFile(filename)
 	if err != nil {
@@ -352,7 +355,6 @@ func (s *Server) getGameName(appid string) (string, error) {
 		return s.Games.Set(appid, fmt.Sprintf("Non-Steam game (%s)", appid)), nil
 	}
 
-	// TODO: rate limiting/cache age
 	if err := s.updateGamesJson(); err == nil {
 		if name := s.Games.Get(appid); name != appid {
 			return name, nil
