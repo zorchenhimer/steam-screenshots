@@ -3,6 +3,8 @@ package steamscreenshots
 import (
 	"encoding/json"
 	"sync"
+	"os"
+	"errors"
 )
 
 // GameIDs maps appids to display names
@@ -10,14 +12,36 @@ import (
 type GameIDs map[string]string
 
 type GameList struct {
-	games GameIDs
-	m     sync.Mutex
+	games    GameIDs
+	m        sync.Mutex
+	filename string
 }
 
-func NewGameList() *GameList {
-	return &GameList{
+func LoadGameList(filename string) (*GameList, error) {
+	gl := &GameList{
 		games: make(map[string]string),
+		m: sync.Mutex{},
+		filename: filename,
 	}
+
+	file, err := os.Open(filename)
+	if errors.Is(err, os.ErrNotExist) {
+		return gl, nil
+	} else if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var games GameIDs
+	dec := json.NewDecoder(file)
+	err = dec.Decode(&games)
+	if err != nil {
+		return nil, err
+	}
+
+	gl.games = games
+
+	return gl, nil
 }
 
 func ParseGames(raw []byte) (*GameList, error) {

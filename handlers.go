@@ -151,7 +151,7 @@ func (s *Server) handler_thumb(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fullPath := filepath.Join(
-		s.settings.RemoteDirectory,
+		s.settings.ImageDirectory,
 		split[1],
 		"screenshots",
 		"thumbnails",
@@ -175,7 +175,7 @@ func (s *Server) handler_image(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fullPath := filepath.Join(
-		s.settings.RemoteDirectory,
+		s.settings.ImageDirectory,
 		split[1],
 		"screenshots",
 		split[2])
