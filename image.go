@@ -12,6 +12,7 @@ import (
 	"errors"
 	"encoding/json"
 	"slices"
+	"strings"
 
 	"golang.org/x/image/draw"
 )
@@ -243,6 +244,10 @@ func (gi *GameImages) GetMetadata(appid string) []Metadata {
 			Height: meta.Height,
 		})
 	}
+
+	slices.SortFunc(images, func(a, b Metadata) int {
+		return strings.Compare(a.Src, b.Src)
+	})
 
 	return images
 }
