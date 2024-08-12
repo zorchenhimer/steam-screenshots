@@ -1,6 +1,6 @@
 .PHONY: run all clean fmt
 
-all: fmt bin/server bin/uploader
+all: bin/server bin/uploader
 
 clean:
 	-rm -r bin/
