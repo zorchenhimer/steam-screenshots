@@ -103,7 +103,7 @@ func (gi *GameImages) Scan() error {
 
 		dname := dir.Name()
 		foundGames[dname] = nil
-		fmt.Println(dname)
+		//fmt.Println(dname)
 		files, err := os.ReadDir(filepath.Join(gi.Root, dname))
 		if err != nil {
 			return fmt.Errorf("error reading %s: %w", filepath.Join(gi.Root, dname), err)

@@ -186,32 +186,25 @@ func (s *Server) handler_image(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handler_static(w http.ResponseWriter, r *http.Request) {
-	fmt.Println(r.URL)
-	if strings.HasSuffix(r.URL.Path, "/") {
-		fmt.Printf("[handler_static] attempted to get directory: %s\n", r.URL.Path)
-		http.NotFound(w, r)
-		return
-	}
+	subdir   := r.PathValue("subdir")
+	filename := r.PathValue("filename")
 
-	split := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-
-	// The three-length paths are for the PhotoSwipe gallery.
-	if len(split) != 2 && len(split) != 3 {
-		fmt.Printf("[handler_static] split error: %s\n", split)
-		return
-	}
-
-	fullPath := fmt.Sprintf("static/%s", split[1])
-	if len(split) == 3 {
-		fullPath = fmt.Sprintf("%s/%s", fullPath, split[2])
-	}
-
-	if ex := exists(fullPath); ex {
-		http.ServeFile(w, r, fullPath)
+	var relpath string
+	if subdir != "" {
+		relpath = filepath.Join("static", subdir, filename)
 	} else {
-		fmt.Printf("[handler_static] 404 on file %q\n", fullPath)
-		http.NotFound(w, r)
+		relpath = filepath.Join("static", filename)
 	}
+
+	fmt.Println(r.URL, "->", relpath)
+
+	http.ServeFileFS(w, r, s.StaticFiles, relpath)
+	//if ex := exists(relpath); ex {
+	//	http.ServeFile(w, r, relpath)
+	//} else {
+	//	fmt.Printf("[handler_static] 404 on file %q\n", relpath)
+	//	http.NotFound(w, r)
+	//}
 }
 
 func (s *Server) handler_debug(w http.ResponseWriter, r *http.Request) {

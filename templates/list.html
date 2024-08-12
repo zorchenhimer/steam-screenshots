@@ -5,9 +5,9 @@
 {{end}}
 
 {{define "body"}}
+<div id="backlink"><a href="/">&lt;-- Back</a></div><br />
 <div id="thumblist">
-    <div id="backlink"><a href="/">&lt;-- Back</a></div><br />
-    {{range .}}<div class="thumbnail" onclick="return ps({{.Idx}})"><a href="{{.ImageTarget}}"><img src="{{.ThumbnailSrc}}" /></a><div class="thumblink subtext"><a href="{{.ImageTarget}}">{{.Text}}</a></div></div>{{end}}
+    {{range .}}<div class="thumbnail" onclick="return ps({{.Idx}})"><a href="{{.ImageTarget}}"><img src="{{.ThumbnailSrc}}" /><div class="thumblink subtext">{{.Text}}</div></a></div>{{end}}
 </div>
 {{end}}
 

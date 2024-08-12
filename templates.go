@@ -25,7 +25,7 @@ func init_templates() error {
 
 	templates = make(map[string]*template.Template)
 	for _, t := range template_list {
-		if temp, err := template.New(t).ParseFiles("templates/base.html", "templates/"+t+".html"); err != nil {
+		if temp, err := template.New(t).ParseFS(embeddedContent, "templates/base.html", "templates/"+t+".html"); err != nil {
 			return fmt.Errorf("Unable to load %q template: %s", t, err)
 		} else {
 			templates[t] = temp

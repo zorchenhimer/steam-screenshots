@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"math/big"
 	"net/http"
 	"os"
@@ -68,11 +69,13 @@ type Server struct {
 	ImageCache *GameImages
 
 	SettingsFile string
+	StaticFiles fs.FS
 }
 
 func NewServer(settingsFile string) (*Server, error) {
 	s := &Server{
 		SettingsFile: settingsFile,
+		StaticFiles: &staticFiles{},
 	}
 
 	if err := s.loadSettings(settingsFile); err != nil {
@@ -111,7 +114,8 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/thumb/{appid}/{filename}", s.handler_thumb)
 	mux.HandleFunc("/img/{appid}/{filename}", s.handler_image)
 	//mux.HandleFunc("/banner/{appid}", s.handler_banner)
-	mux.HandleFunc("/static/", s.handler_static)
+	mux.HandleFunc("/static/{filename}", s.handler_static)
+	mux.HandleFunc("/static/{subdir}/{filename}", s.handler_static)
 	mux.HandleFunc("/debug/", s.handler_debug)
 	//mux.HandleFunc("/api/get-cache", s.handler_api_cache)
 	//mux.HandleFunc("/api/get-games", s.handler_api_games)
@@ -162,13 +166,6 @@ func (s *Server) Run() error {
 		fmt.Printf("using API key in config: %q\n", s.settings.ApiKey)
 	}
 
-	//go func(s *Server) {
-	//	for {
-	//		s.ImageCache.Save("image.cache")
-	//		time.Sleep(10 * time.Minute)
-	//	}
-	//}(s)
-
 	fmt.Println("Listening on address: " + s.settings.Address)
 	fmt.Println("Fisnished startup.")
 
@@ -196,67 +193,6 @@ func (s *Server) Run() error {
 	fmt.Println("goodbye")
 	return nil
 }
-
-// TODO: use GameImages.FullScan for this?
-//func (s *Server) scan(printOutput bool) error {
-//	s.lastScan = time.Now()
-//
-//	if printOutput {
-//		fmt.Printf("Scanning %q\n", s.settings.RemoteDirectory)
-//	}
-//
-//	dir, err := filepath.Glob(filepath.Join(s.settings.RemoteDirectory, "*"))
-//	if err != nil {
-//		return fmt.Errorf("Unable to glob RemoteDirectory: %s", err)
-//	}
-//	tmpTree := make(map[string][]string)
-//
-//	s.ImageCache.RemoveMissing(s.settings.RemoteDirectory)
-//
-//	for _, d := range dir {
-//		base := filepath.Base(d)
-//
-//		// Ignore dotfiles
-//		if strings.HasPrefix(base, ".") {
-//			continue
-//		}
-//
-//		//if !isDir(d) {
-//		//	fmt.Printf("%q is not a directory\n", d)
-//		//	continue
-//		//}
-//
-//		//if printOutput {
-//		//	fmt.Printf("[%s] %s\n", base, s.Games.Get(base))
-//		//}
-//
-//		//jpg, err := filepath.Glob(filepath.Join(d, "screenshots", "*.jpg"))
-//		//if err != nil {
-//		//	fmt.Printf("JPG glob error in %q: %s", d, err)
-//		//	continue
-//		//}
-//		//tmpTree[base] = jpg
-//
-//		// TODO: merge ImageCache.ScanPath() and ImagePath.RefreshPath(),
-//		// possibly removing the jpg glob above as well.
-//		err = s.ImageCache.ScanPath(d)
-//		if err != nil {
-//			fmt.Println(err)
-//		}
-//	}
-//
-//	fmt.Println("tmpTree", tmpTree)
-//
-//	// Write cache to disk after it's updated in-memory so failing this
-//	// doesn't skip updating.
-//	if err := s.ImageCache.Save("image.cache"); err != nil {
-//		return fmt.Errorf("Unable to save image cache: %s\n", err)
-//	}
-//
-//	fmt.Println("Scan done")
-//
-//	return nil
-//}
 
 func SliceContains(s []string, val string) bool {
 	for _, v := range s {

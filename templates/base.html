@@ -1,4 +1,5 @@
 {{define "main"}}
+<!DOCTYPE html>
 <html>
     <head>
     <title>{{ block "title" .Title}}{{end}}Steam Screenshots</title>
@@ -11,10 +12,10 @@
             /*background-image: url("static/bg-repeat.png");
             background-repeat: repeat-x;*/
         }
-        #backlink {
+        #backlink, #backlink a{
             float: left;
             clear: both;
-            color: #888;
+            color: #FFF;
             font-family: sans-serif;
         }
         #container {
@@ -40,6 +41,7 @@
             float: left;
             padding: 5px;
             margin: auto;
+            height: fit-content;
         }
         .grid {
             float: left;
@@ -63,12 +65,18 @@
             font-family: sans-serif;
             background-color: #05070b;
         }
-        .subtext a, #backlink a {
+        .subtext, #backlink {
             text-decoration: none;
             color: #fff;
         }
-        .subtext a:hover, #backlink a:hover {
+        a {
+            text-decoration: none;
+        }
+        .subtext:hover, #backlink a:hover {
             text-decoration: underline;
+        }
+        .subtext .count {
+            color: #888;
         }
 
         /* game page */
@@ -77,6 +85,8 @@
             width: 200px;
             padding-bottom: 5px;
             padding-top: 3px;
+            position: relative;
+            top: -5px;
         }
 
         /* main page */
@@ -88,6 +98,8 @@
             margin: auto;
             padding-bottom: 5px;
             padding-top: 3px;
+            position: relative;
+            top: -5px;
         }
 
         @media screen and (max-width: 550px) {
@@ -103,6 +115,8 @@
             max-width: 1260px;
             /*min-width: 840px;*/
             margin: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
         }
         @media screen and (max-width: 1300px) {
             #thumblist { width: 1050px; }
