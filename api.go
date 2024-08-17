@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 )
 
 func (s *Server) handler_api_cache(w http.ResponseWriter, r *http.Request) {
@@ -104,8 +105,13 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 
-	for _, ip := range s.settings.ApiWhitelist {
-		if host == ip {
+	if slices.Contains(s.settings.ApiWhitelist, host) {
+		found = true
+	}
+
+	if !found && host == "127.0.0.1" {
+		realIp := r.Header.Get("X-Real-Ip")
+		if realIp != ""  && slices.Contains(s.settings.ApiWhitelist, realIp) {
 			found = true
 		}
 	}
