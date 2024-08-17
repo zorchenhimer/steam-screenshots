@@ -20,9 +20,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	//"path/filepath"
 	"regexp"
-	//"strings"
 	"syscall"
 	"time"
 )
@@ -56,6 +54,11 @@ type steamapps struct {
 	} `json:"applist"`
 }
 
+type NewImage struct {
+	AppId string
+	Filename string
+}
+
 type Server struct {
 	// stats stuff
 	startTime time.Time
@@ -70,12 +73,15 @@ type Server struct {
 
 	SettingsFile string
 	StaticFiles fs.FS
+
+	newImages chan NewImage
 }
 
 func NewServer(settingsFile string) (*Server, error) {
 	s := &Server{
 		SettingsFile: settingsFile,
 		StaticFiles: &staticFiles{},
+		newImages: make(chan NewImage, 1000),
 	}
 
 	if err := s.loadSettings(settingsFile); err != nil {
@@ -113,13 +119,11 @@ func (s *Server) Run() error {
 	mux.HandleFunc("/game/{appid}/{$}", s.handler_game)
 	mux.HandleFunc("/thumb/{appid}/{filename}", s.handler_thumb)
 	mux.HandleFunc("/img/{appid}/{filename}", s.handler_image)
-	//mux.HandleFunc("/banner/{appid}", s.handler_banner)
 	mux.HandleFunc("/static/{filename}", s.handler_static)
 	mux.HandleFunc("/static/{subdir}/{filename}", s.handler_static)
 	mux.HandleFunc("/debug/", s.handler_debug)
-	//mux.HandleFunc("/api/get-cache", s.handler_api_cache)
-	//mux.HandleFunc("/api/get-games", s.handler_api_games)
-	//mux.HandleFunc("/api/add-image", s.handler_api_addImage)
+	mux.HandleFunc("/api/get-cache", s.handler_api_cache)
+	mux.HandleFunc("PUT /api/upload/{appid}/{filename}", s.handler_api_upload)
 
 	server := &http.Server{
 		Addr:           s.settings.Address,
@@ -135,15 +139,12 @@ func (s *Server) Run() error {
 		return fmt.Errorf("error loading image cache: %w", err)
 	}
 
-	go func(s *Server) {
-		for {
-			err := s.ImageCache.Scan()
-			if err != nil {
-				fmt.Println("Error scanning for images:", err)
-			}
-			time.Sleep(2*time.Minute)
-		}
-	}(s)
+	err = s.ImageCache.Scan()
+	if err != nil {
+		fmt.Println("Error scanning for images:", err)
+	}
+
+	go s.imageAdder()
 
 	// Generate a new API key if it's empty
 	if s.settings.ApiKey == "" {

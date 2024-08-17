@@ -15,7 +15,7 @@ import (
 	//"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,105 +24,104 @@ import (
 	ss "github.com/zorchenhimer/steam-screenshots"
 )
 
-var config *Configuration
-var err error
+var (
+	config *Configuration
+	err error
+	client *http.Client
+)
+
+type ImageCache map[string]map[string]*ss.ImageMeta
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	config, err = ReadConfig("upload-config.json")
 	if err != nil {
-		fmt.Println("Error reading config: ", err)
-		return
+		return err
 	}
 
-	raw, err := apiRequest("get-cache")
+	client = &http.Client{}
+
+	raw, err := apiRequest("get-cache", nil)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
-	serverCache, err := ss.ParseImageCache(raw)
+	remote := ImageCache{}
+	err = json.Unmarshal(raw, &remote)
+	//serverCache, err := ss.ParseImageCache(raw)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
-	fmt.Println("image cache from server:")
-	for key, _ := range serverCache.Games {
-		fmt.Printf("  %s\n", key)
-	}
-
-	//rawgames, err := apiRequest("get-games")
-	//if err != nil {
-	//	fmt.Println(err)
-	//	os.Exit(1)
-	//}
-
-	//gamecache, err := ss.ParseGames(rawgames)
-	//if err != nil {
-	//	fmt.Println(err)
-	//	os.Exit(1)
-	//}
-	//_ = gamecache
-
-	fmt.Println("Running full scan")
-	localCache, err := ss.FullScan(config.RemoteDirectory)
+	local, err := scanForImages(config.RemoteDirectory)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
 
-	removed := map[string][]string{}
-	added := map[string][]ss.ImageMeta{}
-	for key, val := range localCache.Games {
-		fmt.Printf("[%s]\n", key)
-		for _, img := range val {
-			fmt.Printf("  %s\n", img.Name)
-			if !serverCache.Contains(key, img.Name) {
-				added[key] = val
+	fmt.Println("remote count:", len(remote))
+	fmt.Println("local count:", len(local))
+
+	added := make(map[string][]string)
+
+	for appid, files := range local {
+		if _, exists := remote[appid]; !exists {
+			added[appid] = files
+			continue
+		}
+
+		for _, lfile := range files {
+			if _, exists := remote[appid][lfile]; exists {
+				continue
+			}
+
+			added[appid] = append(added[appid], lfile)
+		}
+	}
+
+	fmt.Println("new files:")
+	for appid, files := range added {
+		fmt.Println(" ", appid)
+		for _, f := range files {
+			fmt.Println("   ", f)
+			err = uploadFile(appid, f)
+			if err != nil {
+				return err
 			}
 		}
 	}
 
-	for key, val := range serverCache.Games {
-		for _, img := range val {
-			if !localCache.Contains(key, img.Name) {
-				if _, ok := removed[key]; !ok {
-					removed[key] = []string{}
-				}
-				removed[key] = append(removed[key], img.Name)
-			}
-		}
+	return nil
+}
+
+func uploadFile(appid, filename string) error {
+	file, err := os.Open(filepath.Join(config.RemoteDirectory, appid, "screenshots", filename))
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	reqUrl := fmt.Sprintf("%s/api/upload/%s/%s", config.Server, appid, filename)
+	fmt.Println("request url: ", reqUrl)
+
+	req, err := http.NewRequest("PUT", reqUrl, file)
+	req.Header.Add("api-key", config.Key)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
 	}
 
-	fmt.Println("removed files:", removed)
-	fmt.Println("added files:", added)
-	toRemove := 0
-	if len(removed) > 0 {
-		fmt.Println("images removed")
-		for _, files := range removed {
-			toRemove += len(files)
-		}
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("HTTP error: %s", resp.Status)
 	}
-	fmt.Printf("images to remove: %d\n", toRemove)
 
-	toUpload := 0
-	if len(added) > 0 {
-		fmt.Println("images added")
-		for gamekey, files := range added {
-			toUpload += len(files)
-			for _, f := range files {
-				fmt.Printf("file to upload: [%s] %s\n", gamekey, f)
-				err := uploadImage(gamekey, f)
-				if err != nil {
-					fmt.Printf("error uploading image: %s\n", err)
-				}
-			}
-		}
-	}
-	//fmt.Printf("images to add: %d\n", toUpload)
-
-	//fmt.Println(resp.Body)
-	//fmt.Println(config)
+	return nil
 }
 
 type Configuration struct {
@@ -132,7 +131,7 @@ type Configuration struct {
 }
 
 func ReadConfig(filename string) (*Configuration, error) {
-	raw, err := ioutil.ReadFile(filename)
+	raw, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +149,7 @@ func (cfg Configuration) String() string {
 	return "Server: " + cfg.Server + " Key: " + cfg.Key
 }
 
-func apiRequest(endpoint string) ([]byte, error) {
+func apiRequest(endpoint string, headers map[string]string) ([]byte, error) {
 	reqUrl := fmt.Sprintf("%s/api/%s", config.Server, endpoint)
 	fmt.Println("request url: ", reqUrl)
 
@@ -159,11 +158,17 @@ func apiRequest(endpoint string) ([]byte, error) {
 		return nil, err
 	}
 	req.Header.Add("api-key", config.Key)
+	for key, val := range headers {
+		req.Header.Add(key, val)
+	}
 
-	client := http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("HTTP error: %s", resp.Status)
 	}
 
 	//fmt.Println(resp.Status)
@@ -171,60 +176,48 @@ func apiRequest(endpoint string) ([]byte, error) {
 		return nil, fmt.Errorf("nil body")
 	}
 
-	raw, err := ioutil.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	return raw, nil
 }
 
-// TODO: thumbnail
-func uploadImage(game string, meta ss.ImageMeta) error {
-	reqUrl := fmt.Sprintf("%s/api/add-image", strings.TrimRight(config.Server, "/"))
-	fname := filepath.Join(config.RemoteDirectory, game, "screenshots", meta.Name)
-
-	//rawimg, err := ioutil.ReadFile(fname)
-	//if err != nil {
-	//	return fmt.Errorf("Unable to read image %q: %s", fname, err)
-	//}
-
-	//buf := bytes.NewBuffer(rawimg)
-	//fmt.Printf("image size: %d\n", buf.Len())
-	imgfile, err := os.Open(fname)
+func scanForImages(root string) (map[string][]string, error) {
+	rootdir, err := os.ReadDir(root)
 	if err != nil {
-		return fmt.Errorf("Unable to open image image %q: %s", fname, err)
-	}
-	defer imgfile.Close()
-
-	req, err := http.NewRequest("POST", reqUrl, imgfile)
-	if err != nil {
-		return fmt.Errorf("Unable to create request: %s", err)
+		return nil, err
 	}
 
-	req.Header.Add("api-key", config.Key)
-	req.Header.Add("filename", meta.Name)
-	req.Header.Add("game-id", game)
+	images := make(map[string][]string)
 
-	//fmt.Println("method:", req.Method)
-	client := http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("Error sending request: %s\n", err)
+	for _, dir := range rootdir {
+		if !dir.IsDir() || strings.HasPrefix(dir.Name(), ".") {
+			continue
+		}
+
+		dname := dir.Name()
+		images[dname] = []string{}
+
+		files, err := os.ReadDir(filepath.Join(root, dname, "screenshots"))
+		if err != nil {
+			return nil, err
+		}
+
+		for _, file := range files {
+			if file.IsDir() {
+				continue
+			}
+
+			switch strings.ToLower(filepath.Ext(file.Name())) {
+			case ".jpg", ".jpeg", ".png":
+				images[dname] = append(images[dname], file.Name())
+			default:
+				// nope
+			}
+		}
 	}
-	defer resp.Body.Close()
 
-	//fmt.Println(resp.Status)
-	if resp.StatusCode != 200 {
-		fmt.Printf("Non 200 status code returned: %s\n", resp.Status)
-	}
-
-	//if resp.Body != nil {
-	//	raw, err := ioutil.ReadAll(resp.Body)
-	//	if err != nil {
-	//		return fmt.Errorf("Unable to read body: %s", err)
-	//	}
-	//	//fmt.Printf("Body: %s\n", raw)
-	//}
-
-	return nil
+	return images, nil
 }
+

@@ -1,14 +1,13 @@
-//go:build ignore
 package steamscreenshots
 
 import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
-	"path/filepath"
-	//"strings"
 	"net"
+	"net/http"
+	"os"
+	"path/filepath"
 )
 
 func (s *Server) handler_api_cache(w http.ResponseWriter, r *http.Request) {
@@ -17,7 +16,7 @@ func (s *Server) handler_api_cache(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println("serving image.cache")
 
-	raw, err := json.Marshal(s.ImageCache)
+	raw, err := json.Marshal(s.ImageCache.Games)
 	if err != nil {
 		fmt.Println(err)
 
@@ -28,106 +27,72 @@ func (s *Server) handler_api_cache(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	w.Write(raw)
 }
 
-func (s *Server) handler_api_games(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handler_api_upload(w http.ResponseWriter, r *http.Request) {
 	if !s.checkApiKey(w, r) {
 		return
 	}
 
-	fmt.Println("serving games.cache")
-	http.ServeFile(w, r, "games.cache")
-}
-
-func (s *Server) handler_api_addImage(w http.ResponseWriter, r *http.Request) {
-	if !s.checkApiKey(w, r) {
-		return
-	}
-
-	//fmt.Printf("Request:\n%v\n\n", r)
-	//fmt.Println("method:", r.Method)
-
-	if r.Method != "POST" {
+	appid    := r.PathValue("appid")
+	filename := r.PathValue("filename")
+	if appid == "" || filename == "" {
+		fmt.Println("appid or filename missing")
 		sendApiError(w, ApiError{
-			Code:    http.StatusBadRequest,
-			Message: "Non-POST request",
+			Code: http.StatusBadRequest,
+			Message: "appid or filename missing",
 		})
+		return
 	}
 
-	if err := r.ParseForm(); err != nil {
+	fullname := filepath.Join(s.settings.ImageDirectory, appid, filename)
+	err := os.MkdirAll(filepath.Dir(fullname), 0755)
+	if err != nil {
 		fmt.Println(err)
 		sendApiError(w, ApiError{
-			Code:    http.StatusBadRequest,
-			Message: "ParseForm() error",
+			Code: http.StatusBadRequest,
+			Message: fmt.Sprintf("unable to create appid folder %s: %s", appid, err.Error()),
 		})
+		return
 	}
 
-	gameId := r.Header.Get("game-id")
-	imgName := r.Header.Get("filename")
-
-	if gameId == "" {
-		sendApiError(w, ApiError{
-			Code:    http.StatusBadRequest,
-			Message: "Missing game-id",
-		})
-	}
-
-	if imgName == "" {
-		sendApiError(w, ApiError{
-			Code:    http.StatusBadRequest,
-			Message: "Missing filename",
-		})
-	}
-
-	rawImage, err := io.ReadAll(r.Body)
+	output, err := os.Create(fullname)
 	if err != nil {
-		fmt.Printf("Error reading data: %s\n", err)
+		fmt.Println(err)
 		sendApiError(w, ApiError{
-			Code:    http.StatusInternalServerError,
-			Message: fmt.Sprintf("Error reading image raw data: %s", err),
+			Code: http.StatusBadRequest,
+			Message: fmt.Sprintf("unable to create image file: %s", err.Error()),
 		})
-	}
-
-	fmt.Printf("data size: %d\n", len(rawImage))
-	if len(rawImage) == 0 {
-		fmt.Println("Zero-length image!")
 		return
 	}
+	defer output.Close()
 
-	fullpath := filepath.Join(s.settings.RemoteDirectory, gameId, "screenshots", imgName)
-
-	meta, err := readRawImage(rawImage)
+	_, err = io.Copy(output, r.Body)
 	if err != nil {
-		fmt.Printf("Error reading raw image: %s\n", err)
+		fmt.Println(err)
+		sendApiError(w, ApiError{
+			Code: http.StatusBadRequest,
+			Message: fmt.Sprintf("unable to read image: %s", err.Error()),
+		})
+		output.Close()
+		err = os.Remove(fullname)
+		if err != nil {
+			fmt.Println("unable to remove incomplete file %s: %s", fullname, err.Error())
+		}
 		return
 	}
 
-	err = saveImage(fullpath, rawImage)
-	if err != nil {
-		fmt.Printf("Error saving image: %s\n", err)
-		return
-	}
-
-	meta.Name = imgName
-
-	// Add image to cache
-	s.ImageCache.addImageMeta(gameId, *meta)
-	//s.ImageCache.Save("image.cache")
-	s.ImageCache.Dirty()
-}
-
-func (s *Server) removeImages(w http.ResponseWriter, r *http.Request) {
-	if !s.checkApiKey(w, r) {
-		return
-	}
+	fmt.Printf("[%s] %s uploaded\n", appid, filename)
+	s.newImages <- NewImage{AppId: appid, Filename: filename}
 }
 
 // checkApiKey returns True if the key is valid
 func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 	if s.settings.ApiWhitelist == nil || len(s.settings.ApiWhitelist) == 0 {
 		fmt.Println("No IP addresses in API Whitelist")
+		w.WriteHeader(http.StatusUnauthorized)
 		return false
 	}
 
@@ -135,6 +100,7 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
 		fmt.Printf("Error splitting host and port for %q: %s\n", r.RemoteAddr, err)
+		w.WriteHeader(http.StatusUnauthorized)
 		return false
 	}
 
@@ -146,6 +112,7 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 
 	if !found {
 		fmt.Printf("IP %q not in API whitelist\n", host)
+		w.WriteHeader(http.StatusUnauthorized)
 		return false
 	}
 

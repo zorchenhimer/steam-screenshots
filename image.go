@@ -83,6 +83,101 @@ var supportedImageFormats []string = []string{
 	".png",
 }
 
+func (s *Server) imageAdder() {
+	for {
+		img := <- s.newImages
+		meta, err := s.ImageCache.AddImage(img.AppId, img.Filename)
+		if err != nil {
+			fmt.Println(err)
+			continue
+		}
+
+		fmt.Printf("adding image [%s] %s\n", img.AppId, img.Filename)
+		s.ImageCache.lock.Lock()
+		if _, ok := s.ImageCache.Games[img.AppId]; !ok {
+			s.ImageCache.Games[img.AppId] = make(map[string]*ImageMeta)
+		}
+		s.ImageCache.Games[img.AppId][img.Filename] = meta
+		s.ImageCache.lock.Unlock()
+	}
+}
+
+func (gi *GameImages) AddImage(appid, filename string) (*ImageMeta, error) {
+	fname := filename
+	dname := appid
+
+	fmt.Printf("AddImage(%q, %q)\n", appid, filename)
+
+	if !slices.Contains(supportedImageFormats, filepath.Ext(fname)) {
+		fmt.Println("Unsupported image format:", filepath.Ext(fname))
+		return nil, nil
+	}
+
+	imgFile, err := os.Open(filepath.Join(gi.Root, dname, fname))
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, _, err := image.DecodeConfig(imgFile)
+	imgFile.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	info, err := os.Stat(filepath.Join(gi.Root, dname, fname))
+	if err != nil {
+		return nil, err
+	}
+
+	meta := &ImageMeta{
+		Width:   cfg.Width,
+		Height:  cfg.Height,
+		ModTime: info.ModTime(),
+	}
+
+	// make sure thumbnail exists
+	// TODO: make sure this has a .jpg extension
+	_, err = os.Stat(filepath.Join(gi.Root, dname, "thumbnails", fname))
+	if err == nil {
+		return meta, nil
+	}
+
+	imgFile, err = os.Open(filepath.Join(gi.Root, dname, fname))
+	if err != nil {
+		return nil, err
+	}
+
+	img, _, err := image.Decode(imgFile)
+	imgFile.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	ratio := float64(img.Bounds().Max.Y) / float64(img.Bounds().Max.X)
+	height := int(float64(ThumbWidth) * ratio)
+	thumbImg := image.NewRGBA(image.Rect(0, 0, ThumbWidth, height))
+	draw.ApproxBiLinear.Scale(thumbImg, thumbImg.Bounds(), img, img.Bounds(), draw.Over, nil)
+
+	err = os.MkdirAll(filepath.Join(gi.Root, dname, "thumbnails"), 0755)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: make sure this has a .jpg extension
+	thumbFile, err := os.Create(filepath.Join(gi.Root, dname, "thumbnails", fname))
+	if err != nil {
+		return nil, err
+	}
+
+	err = jpeg.Encode(thumbFile, thumbImg, nil)
+	thumbFile.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return meta, nil
+}
+
 func (gi *GameImages) Scan() error {
 	fmt.Println("starting scan of", gi.Root)
 	start := time.Now()
@@ -116,67 +211,13 @@ func (gi *GameImages) Scan() error {
 				continue
 			}
 
-			fname := file.Name()
-			if !slices.Contains(supportedImageFormats, filepath.Ext(fname)) {
-				fmt.Println("Unsupported image format:", filepath.Ext(fname))
-				continue
-			}
-
-			imgFile, err := os.Open(filepath.Join(gi.Root, dname, fname))
+			meta, err := gi.AddImage(dname, file.Name())
 			if err != nil {
 				return err
 			}
 
-			cfg, _, err := image.DecodeConfig(imgFile)
-			imgFile.Close()
-			if err != nil {
-				return err
-			}
-
-			info, err := os.Stat(filepath.Join(gi.Root, dname, fname))
-			if err != nil {
-				return err
-			}
-
-			dmap[fname] = &ImageMeta{
-				Width:   cfg.Width,
-				Height:  cfg.Height,
-				ModTime: info.ModTime(),
-			}
-
-			// make sure thumbnail exists
-			// TODO: make sure this has a .jpg extension
-			_, err = os.Stat(filepath.Join(gi.Root, dname, "thumbnails", fname))
-			if err == nil {
-				continue
-			}
-
-			imgFile, err = os.Open(filepath.Join(gi.Root, dname, fname))
-			if err != nil {
-				return err
-			}
-
-			img, _, err := image.Decode(imgFile)
-			imgFile.Close()
-			if err != nil {
-				return err
-			}
-
-			ratio := float64(img.Bounds().Max.Y) / float64(img.Bounds().Max.X)
-			height := int(float64(ThumbWidth) * ratio)
-			thumbImg := image.NewRGBA(image.Rect(0, 0, ThumbWidth, height))
-			draw.ApproxBiLinear.Scale(thumbImg, thumbImg.Bounds(), img, img.Bounds(), draw.Over, nil)
-
-			// TODO: make sure this has a .jpg extension
-			thumbFile, err := os.Create(filepath.Join(gi.Root, dname, "thumbnails", fname))
-			if err != nil {
-				return err
-			}
-
-			err = jpeg.Encode(thumbFile, thumbImg, nil)
-			thumbFile.Close()
-			if err != nil {
-				return err
+			if meta != nil {
+				dmap[file.Name()] = meta
 			}
 		}
 
