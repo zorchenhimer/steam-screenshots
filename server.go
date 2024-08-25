@@ -32,7 +32,6 @@ type Settings struct {
 		Appid string `json:"id"`
 		Name  string `json:"name"`
 	}
-	RefreshInterval int    // In minutes
 	ApiKey          string // This will be regenerated if it is empty.
 	ApiWhitelist    []string
 }

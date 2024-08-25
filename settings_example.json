@@ -9,6 +9,7 @@
             "name": "Driver San Francisco"
         }
     ],
-    "RemoteDirectory": "C:/path/to/steam/remote/folder",
-    "RefreshInterval": 10
+    "ImageDirectory": "/var/steam-screenshots/",
+    "ApiWhitelist": ["127.0.0.1"],
+    "ApiKey": ""
 }
