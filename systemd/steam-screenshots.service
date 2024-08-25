@@ -1,0 +1,13 @@
+[Unit]
+Description=Steam Screenshot Server
+After=network.target
+
+[Service]
+Type=simple
+User=sshots
+ExecStart=/opt/SteamScreenshots/server -c /opt/SteamScreenshots/settings.json
+WorkingDirectory=/opt/SteamScreenshots
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

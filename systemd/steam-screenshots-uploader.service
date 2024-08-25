@@ -1,0 +1,10 @@
+[Unit]
+Description=Uploader for Steam Screenshots server
+
+[Service]
+ExecStart=/opt/SteamScreenshots/uploader
+WorkingDirectory=/opt/SteamScreenshots/
+
+# Change this to the user with Steam installed
+User=nick
+

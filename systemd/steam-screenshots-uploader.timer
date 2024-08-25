@@ -1,0 +1,10 @@
+[Unit]
+Descirption=Steam Screenshot Uploader timer
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=%i.service
+
+[Install]
+WantedBy=timers.target
