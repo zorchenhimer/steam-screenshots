@@ -1,5 +1,8 @@
 .PHONY: run all clean fmt
 
+HASH=$(shell git rev-parse HEAD)
+VERSION=$(shell git describe --abbrev=0 --tags)
+
 all: bin/server bin/uploader
 
 clean:
@@ -12,4 +15,4 @@ fmt:
 	go fmt ./...
 
 bin/%: cmd/%.go *.go
-	go build -o $@ $<
+	CGO_ENABLED=0 go build -ldflags "-X github.com/zorchenhimer/steam-screenshots.gitCommit=${HASH} -X github.com/zorchenhimer/steam-screenshots.version=${VERSION}" -o $@ $<
