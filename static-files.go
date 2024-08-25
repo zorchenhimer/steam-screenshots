@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-//go:embed static templates
+//go:embed static templates banners/unknown.jpg
 var embeddedContent embed.FS
 
 type staticFiles struct {

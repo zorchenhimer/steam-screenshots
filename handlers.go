@@ -153,13 +153,10 @@ func (s *Server) handler_image(w http.ResponseWriter, r *http.Request) {
 	filename := r.PathValue("filename")
 
 	if filename == "banner.jpg" {
-		//fmt.Println(r.URL)
 		if _, exists := s.ImageCache.Games[appid]; exists {
 			bannerpath, err := s.getGameBanner(appid)
 			if err != nil {
-				// TODO: fallback to default image
-				//http.Error(w, err.Error(), 500)
-				http.ServeFile(w, r, "banners/unknown.jpg")
+				http.ServeFileFs(w, r, s.StaticFiles, "banners/unknown.jpg")
 				return
 			}
 			http.ServeFile(w, r, bannerpath)
@@ -196,15 +193,7 @@ func (s *Server) handler_static(w http.ResponseWriter, r *http.Request) {
 		relpath = filepath.Join("static", filename)
 	}
 
-	fmt.Println(r.URL, "->", relpath)
-
 	http.ServeFileFS(w, r, s.StaticFiles, relpath)
-	//if ex := exists(relpath); ex {
-	//	http.ServeFile(w, r, relpath)
-	//} else {
-	//	fmt.Printf("[handler_static] 404 on file %q\n", relpath)
-	//	http.NotFound(w, r)
-	//}
 }
 
 func (s *Server) handler_debug(w http.ResponseWriter, r *http.Request) {
