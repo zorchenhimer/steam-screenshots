@@ -230,10 +230,6 @@ func (s *Server) loadSettings(filename string) error {
 
 	fmt.Println("Settings loaded")
 
-	if s.settings.RefreshInterval < 1 {
-		s.settings.RefreshInterval = 1
-	}
-
 	// TODO: make this filename configurable
 	s.Games, err = LoadGameList("games.cache")
 	return err
