@@ -156,7 +156,7 @@ func (s *Server) handler_image(w http.ResponseWriter, r *http.Request) {
 		if _, exists := s.ImageCache.Games[appid]; exists {
 			bannerpath, err := s.getGameBanner(appid)
 			if err != nil {
-				http.ServeFileFs(w, r, s.StaticFiles, "banners/unknown.jpg")
+				http.ServeFileFS(w, r, s.StaticFiles, "banners/unknown.jpg")
 				return
 			}
 			http.ServeFile(w, r, bannerpath)
