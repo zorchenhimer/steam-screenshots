@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 )
 
 func (s *Server) handler_api_cache(w http.ResponseWriter, r *http.Request) {
