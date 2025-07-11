@@ -51,6 +51,9 @@ func main() {
 
 	client = &http.Client{}
 
+	// Wait for server to be ready
+	waitForServer()
+
 	// Check if we should run once or continuously
 	if config.Interval > 0 {
 		fmt.Printf("Running uploader in continuous mode with interval of %d seconds\n", config.Interval)
@@ -207,6 +210,46 @@ func apiRequest(endpoint string, headers map[string]string) ([]byte, error) {
 		return nil, err
 	}
 	return raw, nil
+}
+
+func waitForServer() {
+	fmt.Printf("Waiting for server at %s to be ready...\n", config.Server)
+	retryDelay := 5 * time.Second
+	
+	for i := 0; i < 60; i++ { // 5 minutes max
+		if i > 0 {
+			time.Sleep(retryDelay)
+		}
+		
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/get-cache", config.Server), nil)
+		if err != nil {
+			fmt.Printf("Error creating request: %v. Retrying...\n", err)
+			continue
+		}
+		req.Header.Add("api-key", config.Key)
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("Server not ready: %v. Retrying...\n", err)
+			continue
+		}
+		defer resp.Body.Close()
+		
+		switch resp.StatusCode {
+		case 200:
+			fmt.Println("Server is ready!")
+			return
+		case 401, 403:
+			fmt.Printf("Authentication failed (status %d). Please check your API key or white list configuration.\n", resp.StatusCode)
+			fmt.Printf("Waiting 30 seconds for config fix before restarting...\n")
+			time.Sleep(30 * time.Second)
+			os.Exit(1)
+		default:
+			fmt.Printf("Server returned status %d. Retrying...\n", resp.StatusCode)
+		}
+	}
+	
+	fmt.Println("Warning: Server did not become ready after 5 minutes. Proceeding anyway...")
 }
 
 func scanForImages(root string) (map[string][]string, error) {
