@@ -7,8 +7,8 @@ This directory contains Docker configurations for running the Steam Screenshots 
 1. Copy the example .env and configuration files in the config directory:
    ```bash
    cp .env.example .env
-   cp config/server-config.json.example config/server-config.json
-   cp config/upload-config.json.example config/upload-config.json
+   cp config/server-config.docker.json.example config/server-config.docker.json
+   cp config/upload-config.docker.json.example config/upload-config.docker.json
    ```
 
 2. Edit the configuration files:
@@ -47,13 +47,13 @@ This directory contains Docker configurations for running the Steam Screenshots 
 
 ## App Configuration
 
-### Server (config/server-config.json)
+### Server (config/server-config.docker.json)
 - `Address`: The bind address and port (default: ":8080") **(NOTE: leave port as 8080, set STEAM_SCREENSHOTS_PORT in the .env instead)**
 - `ImageDirectory`: Where screenshots are stored **(NOTE: don't change this, set STEAM_SCREENSHOTS_APPDATA in the .env instead)**
 - `ApiWhitelist`: IP addresses/hostnames allowed to use the API
 - `ApiKey`: Shared secret for API authentication
 
-### Uploader (upload-config.json)
+### Uploader (upload-config.docker.json)
 - `ServerUrl`: URL to reach the server (default: "http://server:8080")
 - `ApiKey`: Must match the server's ApiKey
 - `ScreenshotDirectory`: Local directory with screenshots to upload **(NOTE: don't change this, set STEAM_SCREENSHOTS_REMOTE in the .env instead)**

@@ -37,4 +37,4 @@ COPY --from=builder /app/banners ./banners
 EXPOSE 8080
 
 # Run the server
-CMD ["./server", "-c", "/app/config/server-config.json"]
+CMD ["./server", "-c", "/app/config/server-config.docker.json"]

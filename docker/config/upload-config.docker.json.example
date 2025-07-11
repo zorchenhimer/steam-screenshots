@@ -2,5 +2,5 @@
     "Server": "http://server:8080",
     "Key": "your-secure-api-key-here",
     "RemoteDirectory": "/app/appdata/remote",
-    "Interval": 10
+    "Interval": 3600
 }

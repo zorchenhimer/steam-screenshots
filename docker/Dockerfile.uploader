@@ -29,4 +29,4 @@ WORKDIR /app
 COPY --from=builder /app/uploader .
 
 # Run the uploader
-CMD ["./uploader", "-c", "/app/config/upload-config.json"]
+CMD ["./uploader", "-c", "/app/config/upload-config.docker.json"]
