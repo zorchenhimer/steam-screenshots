@@ -1,0 +1,15 @@
+{
+    "Address": ":8080",
+    "AppidOverrides": [
+        {
+            "id": "231410",
+            "name": "Kerbal Space Program Demo"
+        }, {
+            "id": "33440",
+            "name": "Driver San Francisco"
+        }
+    ],
+    "ImageDirectory": "/app/appdata/screenshots/",
+    "ApiWhitelist": ["127.0.0.1", "uploader"],
+    "ApiKey": "your-secure-api-key-here"
+}
