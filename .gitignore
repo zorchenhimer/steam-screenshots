@@ -1,6 +1,7 @@
 *.cache
 *.exe
 *.swp
+*.env
 
 *.json
 !settings_example.json
