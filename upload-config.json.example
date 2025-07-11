@@ -1,6 +1,0 @@
-{
-    "Server": "http://server:8080",
-    "Key": "your-secure-api-key-here",
-    "RemoteDirectory": "/screenshots/",
-    "Interval": 10
-}

@@ -74,10 +74,12 @@ The `Interval` value is the number of seconds between scans, setting it to zero 
  * Game grid icons are also retrieved from steam's servers and cached locally.
  Non-Steam games will use a default "unknown" image.
 
+## Docker
+  See the [docker/README.md](docker/README.md) for docker instructions.
+
 ## TODO
 
  * Some sort of install script or pacakge building script
- * Docker?
 
 ## License
 

@@ -30,7 +30,7 @@ This directory contains Docker configurations for running the Steam Screenshots 
    # Set this to the steam screenshot directory named 'remote' on the uploads
    # e.g. /home/deck/.local/share/Steam/userdata/<steam_user_id>/760/remote on Steamdeck
    # or C:\Program Files (x86)\Steam\userdata\<steam_user_id>\760\remote on Windows
-   STEAM_SCREENSHOTS_REMOTE=./remote
+   STEAM_SCREENSHOTS_REMOTE=/path/to/screenshots/remote/
 
    ```
 
