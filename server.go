@@ -159,7 +159,7 @@ func (s *Server) Run() error {
 		}
 		s.settings.ApiKey = out
 		fmt.Println("New API key generated: " + s.settings.ApiKey)
-		if err = s.saveSettings("settings.json"); err != nil {
+		if err = s.saveSettings(s.SettingsFile); err != nil {
 			panic(fmt.Sprintf("unable to save settings: %v", err))
 		}
 	} else {
