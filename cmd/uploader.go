@@ -20,6 +20,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/alexflint/go-arg"
 
 	ss "github.com/zorchenhimer/steam-screenshots"
 )
@@ -32,20 +35,42 @@ var (
 
 type ImageCache map[string]map[string]*ss.ImageMeta
 
+type Arguments struct {
+	SettingsFile string `arg:"-c,--config" default:"upload-config.json"`
+}
+
 func main() {
-	if err := run(); err != nil {
+	args := &Arguments{}
+	arg.MustParse(args)
+
+	config, err = ReadConfig(args.SettingsFile)
+	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	client = &http.Client{}
+
+	// Check if we should run once or continuously
+	if config.Interval > 0 {
+		fmt.Printf("Running uploader in continuous mode with interval of %d seconds\n", config.Interval)
+		for {
+			if err := run(); err != nil {
+				fmt.Printf("Upload error: %v\n", err)
+			}
+			fmt.Printf("Sleeping for %d seconds...\n", config.Interval)
+			time.Sleep(time.Duration(config.Interval) * time.Second)
+		}
+	} else {
+		// Single run mode
+		if err := run(); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
 }
 
 func run() error {
-	config, err = ReadConfig("upload-config.json")
-	if err != nil {
-		return err
-	}
-
-	client = &http.Client{}
 
 	raw, err := apiRequest("get-cache", nil)
 	if err != nil {
@@ -128,6 +153,7 @@ type Configuration struct {
 	Server          string // Server IP/URL and Port with preceding "http://" or "https://"
 	Key             string // Upload key.  This needs to be kept private.
 	RemoteDirectory string // steam's "remote" directory
+	Interval        int    // Interval in seconds between upload checks (0 = run once)
 }
 
 func ReadConfig(filename string) (*Configuration, error) {
