@@ -126,33 +126,13 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 			}
 
 			// Check if any resolved IP matches the request host
-			for _, addr := range addrs {
-				if addr == host {
-					found = true
-					break
-				}
-			}
-			if found {
+			if slices.Contains(addrs, host) {
+				found = true
 				break
 			}
 		}
 	}
 
-	// Also check if the request came from a hostname that's in the whitelist
-	if !found {
-		// Try reverse lookup on the IP
-		names, err := net.LookupAddr(host)
-		if err == nil {
-			for _, name := range names {
-				// Remove trailing dot from FQDN
-				name = strings.TrimSuffix(name, ".")
-				if slices.Contains(s.settings.ApiWhitelist, name) {
-					found = true
-					break
-				}
-			}
-		}
-	}
 
 	if !found && host == "127.0.0.1" {
 		realIp := r.Header.Get("X-Real-Ip")
