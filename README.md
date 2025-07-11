@@ -57,13 +57,15 @@ installed.  There is an example Systemd unit file in the `systemd` folder.
 {
     "Server": "http://127.0.0.1:8080",
     "Key": "",
-    "RemoteDirectory": "/path/to/steam/remote/folder/"
+    "RemoteDirectory": "/path/to/steam/remote/folder/",
+    "Interval": 60
 }
 ```
 
 The remote directory can be found by clicking on the "Show on disk" button in
 the Steam Screenshot Manager window.  The path entered into the configuration
 should be an absolute path ending in `remote/`.
+The `Interval` value is the number of seconds between scans, setting it to zero will cause the uploader to exit after a single pass.
 
 ## Notes
 
