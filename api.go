@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 )
 
 func (s *Server) handler_api_cache(w http.ResponseWriter, r *http.Request) {
@@ -105,8 +106,52 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 
+	// Check if the host is directly in the whitelist
 	if slices.Contains(s.settings.ApiWhitelist, host) {
 		found = true
+	}
+
+	// Check if any whitelist entry is a hostname that resolves to the request IP
+	if !found {
+		for _, entry := range s.settings.ApiWhitelist {
+			// Skip if entry looks like an IP address
+			if net.ParseIP(entry) != nil {
+				continue
+			}
+
+			// Try to resolve the hostname
+			addrs, err := net.LookupHost(entry)
+			if err != nil {
+				continue
+			}
+
+			// Check if any resolved IP matches the request host
+			for _, addr := range addrs {
+				if addr == host {
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+	}
+
+	// Also check if the request came from a hostname that's in the whitelist
+	if !found {
+		// Try reverse lookup on the IP
+		names, err := net.LookupAddr(host)
+		if err == nil {
+			for _, name := range names {
+				// Remove trailing dot from FQDN
+				name = strings.TrimSuffix(name, ".")
+				if slices.Contains(s.settings.ApiWhitelist, name) {
+					found = true
+					break
+				}
+			}
+		}
 	}
 
 	if !found && host == "127.0.0.1" {
@@ -117,7 +162,7 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	if !found {
-		fmt.Printf("IP %q not in API whitelist\n", host)
+		fmt.Printf("IP/hostname %q not in API whitelist\n", host)
 		w.WriteHeader(http.StatusUnauthorized)
 		return false
 	}
