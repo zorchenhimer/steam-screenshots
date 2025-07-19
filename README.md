@@ -57,13 +57,16 @@ installed.  There is an example Systemd unit file in the `systemd` folder.
 {
     "Server": "http://127.0.0.1:8080",
     "Key": "",
-    "RemoteDirectory": "/path/to/steam/remote/folder/"
+    "RemoteDirectory": "/path/to/steam/remote/folder/",
+    "Interval": 3600
 }
 ```
 
 The remote directory can be found by clicking on the "Show on disk" button in
 the Steam Screenshot Manager window.  The path entered into the configuration
-should be an absolute path ending in `remote/`.
+should be an absolute path ending in `remote/`.  
+
+The `Interval` value is the number of seconds between scans, setting it to zero will cause the uploader to exit after a single pass.
 
 ## Notes
 
@@ -72,10 +75,12 @@ should be an absolute path ending in `remote/`.
  * Game grid icons are also retrieved from steam's servers and cached locally.
  Non-Steam games will use a default "unknown" image.
 
+## Docker
+  See the [docker/README.md](docker/README.md) for docker instructions.
+
 ## TODO
 
  * Some sort of install script or pacakge building script
- * Docker?
 
 ## License
 

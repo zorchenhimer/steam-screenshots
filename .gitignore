@@ -1,9 +1,11 @@
 *.cache
 *.exe
 *.swp
+*.env
 
 *.json
 !settings_example.json
+!upload-config_example.json
 
 PhotoSwipe-master/
 builds/

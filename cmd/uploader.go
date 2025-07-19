@@ -20,6 +20,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/alexflint/go-arg"
 
 	ss "github.com/zorchenhimer/steam-screenshots"
 )
@@ -32,20 +35,45 @@ var (
 
 type ImageCache map[string]map[string]*ss.ImageMeta
 
+type Arguments struct {
+	SettingsFile string `arg:"-c,--config" default:"upload-config.json"`
+}
+
 func main() {
-	if err := run(); err != nil {
+	args := &Arguments{}
+	arg.MustParse(args)
+
+	config, err = ReadConfig(args.SettingsFile)
+	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
+	}
+
+	client = &http.Client{}
+
+	// Wait for server to be ready
+	waitForServer()
+
+	// Check if we should run once or continuously
+	if config.Interval > 0 {
+		fmt.Printf("Running uploader in continuous mode with interval of %d seconds\n", config.Interval)
+		for {
+			if err := run(); err != nil {
+				fmt.Printf("Upload error: %v\n", err)
+			}
+			fmt.Printf("Sleeping for %d seconds...\n", config.Interval)
+			time.Sleep(time.Duration(config.Interval) * time.Second)
+		}
+	} else {
+		// Single run mode
+		if err := run(); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
 	}
 }
 
 func run() error {
-	config, err = ReadConfig("upload-config.json")
-	if err != nil {
-		return err
-	}
-
-	client = &http.Client{}
 
 	raw, err := apiRequest("get-cache", nil)
 	if err != nil {
@@ -128,6 +156,7 @@ type Configuration struct {
 	Server          string // Server IP/URL and Port with preceding "http://" or "https://"
 	Key             string // Upload key.  This needs to be kept private.
 	RemoteDirectory string // steam's "remote" directory
+	Interval        int    // Interval in seconds between upload checks (0 = run once)
 }
 
 func ReadConfig(filename string) (*Configuration, error) {
@@ -181,6 +210,46 @@ func apiRequest(endpoint string, headers map[string]string) ([]byte, error) {
 		return nil, err
 	}
 	return raw, nil
+}
+
+func waitForServer() {
+	fmt.Printf("Waiting for server at %s to be ready...\n", config.Server)
+	retryDelay := 5 * time.Second
+	
+	for i := 0; i < 60; i++ { // 5 minutes max
+		if i > 0 {
+			time.Sleep(retryDelay)
+		}
+		
+		req, err := http.NewRequest("POST", fmt.Sprintf("%s/api/get-cache", config.Server), nil)
+		if err != nil {
+			fmt.Printf("Error creating request: %v. Retrying...\n", err)
+			continue
+		}
+		req.Header.Add("api-key", config.Key)
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("Server not ready: %v. Retrying...\n", err)
+			continue
+		}
+		defer resp.Body.Close()
+		
+		switch resp.StatusCode {
+		case 200:
+			fmt.Println("Server is ready!")
+			return
+		case 401, 403:
+			fmt.Printf("Authentication failed (status %d). Please check your API key or white list configuration.\n", resp.StatusCode)
+			fmt.Printf("Waiting 30 seconds for config fix before restarting...\n")
+			time.Sleep(30 * time.Second)
+			os.Exit(1)
+		default:
+			fmt.Printf("Server returned status %d. Retrying...\n", resp.StatusCode)
+		}
+	}
+	
+	fmt.Println("Warning: Server did not become ready after 5 minutes. Proceeding anyway...")
 }
 
 func scanForImages(root string) (map[string][]string, error) {

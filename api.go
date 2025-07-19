@@ -105,9 +105,33 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 
+	// Check if the host is directly in the whitelist
 	if slices.Contains(s.settings.ApiWhitelist, host) {
 		found = true
 	}
+
+	// Check if any whitelist entry is a hostname that resolves to the request IP
+	if !found {
+		for _, entry := range s.settings.ApiWhitelist {
+			// Skip if entry looks like an IP address
+			if net.ParseIP(entry) != nil {
+				continue
+			}
+
+			// Try to resolve the hostname
+			addrs, err := net.LookupHost(entry)
+			if err != nil {
+				continue
+			}
+
+			// Check if any resolved IP matches the request host
+			if slices.Contains(addrs, host) {
+				found = true
+				break
+			}
+		}
+	}
+
 
 	if !found && host == "127.0.0.1" {
 		realIp := r.Header.Get("X-Real-Ip")
@@ -117,7 +141,7 @@ func (s *Server) checkApiKey(w http.ResponseWriter, r *http.Request) bool {
 	}
 
 	if !found {
-		fmt.Printf("IP %q not in API whitelist\n", host)
+		fmt.Printf("IP/hostname %q not in API whitelist\n", host)
 		w.WriteHeader(http.StatusUnauthorized)
 		return false
 	}

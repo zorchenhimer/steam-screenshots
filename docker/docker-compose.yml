@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.server
+    ports:
+      - ${STEAM_SCREENSHOTS_PORT:-8080}:8080
+    volumes:
+      - ${STEAM_SCREENSHOTS_CONFIG:-./config}/server-config.docker.json:/app/config/server-config.docker.json:rw
+      - ${STEAM_SCREENSHOTS_APPDATA:-./appdata}:/app/appdata:rw
+    environment:
+      - TZ=UTC
+    restart: unless-stopped
+    networks:
+      - steam-screenshots
+
+  uploader:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.uploader
+    volumes:
+      - ${STEAM_SCREENSHOTS_CONFIG:-./config}/upload-config.docker.json:/app/config/upload-config.docker.json:rw
+      - ${STEAM_SCREENSHOTS_REMOTE:-./remote}:/app/appdata/remote:ro
+    restart: unless-stopped
+    networks:
+      - steam-screenshots
+
+networks:
+  steam-screenshots:
+    driver: bridge
